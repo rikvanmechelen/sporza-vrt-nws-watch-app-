@@ -1,6 +1,7 @@
 package be.vanmechelen.vrtnws.ui.headlines
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,11 +69,31 @@ fun HeadlinesScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             item {
-                Text(
-                    text = androidx.compose.ui.res.stringResource(source.labelRes),
-                    style = MaterialTheme.typography.title3,
-                    color = MaterialTheme.colors.primary,
-                )
+                val refreshLabel = androidx.compose.ui.res.stringResource(R.string.refresh)
+                Row(
+                    modifier = Modifier
+                        .clickable(onClick = viewModel::refresh)
+                        .semantics { contentDescription = refreshLabel },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = androidx.compose.ui.res.stringResource(source.labelRes),
+                        style = MaterialTheme.typography.title3,
+                        color = MaterialTheme.colors.primary,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    if (ui.isRefreshing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(android.R.drawable.stat_notify_sync),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colors.primary,
+                        )
+                    }
+                }
             }
             if (ui.showOfflineBanner) {
                 item {
@@ -83,24 +106,6 @@ fun HeadlinesScreen(
             }
             items(ui.articles, key = { it.id }) { article ->
                 HeadlineCard(article, onClick = { onArticleClick(article) })
-            }
-            item {
-                Chip(
-                    label = { Text(androidx.compose.ui.res.stringResource(R.string.refresh)) },
-                    icon = {
-                        if (ui.isRefreshing) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(
-                                painter = androidx.compose.ui.res.painterResource(android.R.drawable.stat_notify_sync),
-                                contentDescription = null,
-                            )
-                        }
-                    },
-                    onClick = viewModel::refresh,
-                    colors = ChipDefaults.secondaryChipColors(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
     }
