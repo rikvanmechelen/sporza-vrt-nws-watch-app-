@@ -1,22 +1,27 @@
 # VRT NWS — Wear OS
 
 A standalone Wear OS app (built for the Pixel Watch 4) that lists the latest VRT NWS
-headlines and lets you read the full article natively on-wrist, with offline caching,
-a Tile, and a watch-face complication.
+headlines, lets you read the full article natively on-wrist, and follows live Sporza
+match scores — with offline caching, a Tile, and a watch-face complication.
 
 Feed source: `https://www.vrt.be/vrtnws/nl.rss.articles.xml` (an **Atom** feed).
+Live scores come from the Sporza calendar (`https://sporza.be/nl/kalender`, scraped HTML).
 
 ## Features
 
-- **Three sources in a horizontal pager**, with a dot indicator at the top — swipe
-  left/right between **Kort** (VRT NWS top headlines), **Sport** (Sporza) and **Nieuws**
-  (VRT NWS latest). Each is its own headline list.
+- **Four pages in a horizontal pager**, with a dot indicator at the top — swipe left/right
+  between **Kort** (VRT NWS top headlines), **Sport** (Sporza), **Nieuws** (VRT NWS latest,
+  browsable by category) and **Matches** (live Sporza scores). Each is its own screen.
 - Scrollable headline list with thumbnails and relative timestamps (rotary-crown + touch).
 - Native article reader — the article page is fetched and its body extracted/reformatted
   for the round screen; a **"Open op telefoon"** button hands off to the phone browser.
-- Offline caching (Room): headlines and previously read articles remain available offline.
-- **Tap the source title** to force-refresh that feed. Swipe from the left edge returns
-  from an article to the list.
+- **Matches**: live match results grouped by sport (voetbal first) with scores and status.
+  Tap a match for its detail — quick events (goals / subs / cards), the **"Fase per fase"**
+  live update stream, and the match recap.
+- Offline caching (Room) for headlines and read articles; match scores are cached in-memory
+  (they are ephemeral) and refreshed on demand.
+- **Tap the section title** to force-refresh that page. Swipe from the left edge returns from
+  an article or match detail to the list.
 - **Tile** and **complication** showing the latest headline, tap to open the app.
 
 ## Architecture
@@ -25,13 +30,17 @@ Single `:app` module, Kotlin + Jetpack Compose for Wear OS.
 
 ```
 data/
-  remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services
+  remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services,
+          MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores)
   local/  Room: ArticleEntity (id+source) + ArticleBodyEntity (url) + BlockConverters,
           ArticleDao, NewsDatabase, RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
-model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsSource (feeds)
-ui/       MainActivity, AppRoot (HorizontalPager over sources + SwipeToDismissBox reader), theme,
-          headlines/ (Screen + ViewModel, per-source), article/ (Screen + ViewModel)
+  MatchesRepository.kt (MatchesService + MatchesRepository + in-memory DefaultMatchesRepository)
+model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsSource (feeds),
+          Match / MatchDetail (MatchEvent, StreamItem) + MatchSports
+ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
+          reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
+          article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
 tile/         LatestHeadlineTileService (ProtoLayout)
 complication/ LatestHeadlineComplicationService
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
@@ -39,7 +48,9 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 
 **Sources:** `NewsSource` enum holds the three Atom feed URLs (all parsed by the one
 `AtomFeedParser`). Headlines are cached per `(id, source)` — feeds overlap — while article
-bodies are cached once, keyed by `url`.
+bodies are cached once, keyed by `url`. The pager iterates a `PagerTab` sealed type
+(`News(source)` × 3, then `Matches`) rather than `NewsSource` directly, so Matches — which
+is not feed/article-shaped — lives on a parallel path with its own repository.
 
 **Data flow:** `OkHttpFeedService.fetchHeadlines(source.feedUrl)` → `AtomFeedParser` →
 `NewsRepository.refresh(source)` upserts into Room and `headlines(source)` exposes a cache-first
@@ -60,6 +71,27 @@ bodies are cached once, keyed by `url`.
    main container to skip nav/related teasers; falls back to whole-document if needed.
 
 If all fail, the reader shows the "Open op telefoon" fallback.
+
+### Matches (live scores)
+
+The **Matches** section is HTML-scraped (no JSON dependency), mirroring the feed/article
+extractors, and cached in memory (`DefaultMatchesRepository`) since scores are ephemeral:
+
+- **List** — `MatchCalendarParser` parses `https://sporza.be/nl/kalender`. Each match is a
+  `<a>` scoreboard whose href (`/nl/sport/{sport}/~{id}/`) gives the sport; matches are
+  grouped voetbal-first. Scoreboard markup differs per sport (football = teams + goal score,
+  tennis = players with the score only in the a11y text, cycling = no teams), so
+  `Match.home/away/score` are nullable and `Match.title` is the always-present fallback.
+- **Detail** — `MatchDetailExtractor` parses the match page into three regions: quick events
+  from the field-timeline widget (pre-formatted "29' - Doelpunt - …"), the **"Fase per fase"**
+  live stream (`.sw-timeline-item`), and the editorial recap (article prose, excluding the
+  live widgets, reusing `ContentBlock`). Empty result → "Open op telefoon" fallback.
+- Sporza uses hashed CSS-module class names (`_scoreboard_mdatp_36`), so selectors match on
+  `[class*=prefix]`, never exact names — the single place to adjust if Sporza changes markup.
+- Sporza also exposes a live-scoreboard JSON API
+  (`https://api.sporza.be/web/content/{sport}/matches/{id}`, with a poll `interval`) for
+  live matches; it is **not** used yet — the app is tap-to-refresh — but is the natural
+  upgrade path for auto-polling.
 
 ## Build & deploy
 

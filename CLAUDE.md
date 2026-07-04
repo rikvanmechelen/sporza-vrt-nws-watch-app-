@@ -5,8 +5,9 @@ Guidance for working in this repo. See `README.md` for the user-facing overview.
 ## What this is
 
 A standalone **Wear OS** app (built for the Pixel Watch 4) that browses VRT NWS / Sporza
-headlines and reads full articles natively on-wrist, with offline caching, a Tile, and a
-complication. Kotlin + Jetpack Compose for Wear, single `:app` module, manual DI.
+headlines, reads full articles natively on-wrist, and follows live Sporza match scores —
+with offline caching, a Tile, and a complication. Kotlin + Jetpack Compose for Wear, single
+`:app` module, manual DI.
 
 ## Workflow (important — the user's stated preference)
 
@@ -48,13 +49,17 @@ export ANDROID_HOME=$HOME/Android/Sdk           # adb at $ANDROID_HOME/platform-
 
 ```
 data/
-  remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services
+  remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services,
+          MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores)
   local/  Room: ArticleEntity (PK id+source) + ArticleBodyEntity (PK url) + BlockConverters,
           ArticleDao, NewsDatabase (v2), RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
-model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsSource
-ui/       MainActivity, AppRoot (HorizontalPager over sources + SwipeToDismissBox reader),
-          theme, headlines/ (Screen + ViewModel, per-source), article/ (Screen + ViewModel)
+  MatchesRepository.kt (MatchesService + MatchesRepository + in-memory DefaultMatchesRepository)
+model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsSource,
+          Match / MatchDetail (MatchEvent, StreamItem) + MatchSports
+ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
+          reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
+          article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
 tile/ · complication/     glanceable latest headline
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
@@ -62,8 +67,14 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 - **Sources** (`NewsSource` enum, feeds parsed by the one `AtomFeedParser`): Kort
   (`nl.rss.headlines.xml`), Sport (`sporza.be/nl.rss.articles.xml`), Nieuws
   (`nl.rss.articles.xml`). Enum declaration order = pager order.
-- **Cache-first**: `refresh(source)` fetches the feed → Room; `headlines(source)` is a
+- **Pager tabs**: `AppRoot` iterates a `PagerTab` sealed type — `News(source)` for the three
+  feeds, then `Matches`. `NewsSource` is coupled to Atom-feed→Article→Room, so Matches runs on
+  a parallel path (its own service/repository), not as a `NewsSource` value.
+- **Cache-first (news)**: `refresh(source)` fetches the feed → Room; `headlines(source)` is a
   `Flow`; `body(url)` is cache-first, keyed by url.
+- **Matches** (`MatchesRepository`, in-memory — scores are ephemeral): `refresh()` scrapes the
+  Sporza kalender via `MatchCalendarParser`; `detail(url)` is cache-first via
+  `MatchDetailExtractor`. No Room. Tap-to-refresh, no auto-polling.
 
 ## Gotchas (don't accidentally revert these)
 
@@ -76,6 +87,16 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   1) VRT `prose-article-*` DOM, 2) JSON-LD `articleBody`/`liveBlogUpdate` (Sporza matches),
   3) main-scoped `<p>`/`<h2>` (Sporza articles have no prose-article-* classes).
   Empty result → UI shows the "Open op telefoon" fallback.
+- **Match parsers** (`MatchCalendarParser` / `MatchDetailExtractor`) are the place to tune if
+  Sporza changes. Sporza uses **hashed CSS-module class names** (`_scoreboard_mdatp_36`), so
+  match on `[class*=prefix]`, never exact names (stable non-hashed classes: `.sw-timeline`,
+  `.sw-timeline-item`). Scoreboard markup differs per sport (football teams+score, tennis
+  set-columns, cycling no teams) → `Match.home/away/score` nullable, `Match.title` the fallback.
+  Detail regions: field-timeline `[class*=hoverLabel]` (events), `.sw-timeline-item` (stream),
+  article prose minus live widgets (recap). A live-scoreboard JSON API exists
+  (`api.sporza.be/web/content/{sport}/matches/{id}`, poll `interval`) but is unused.
+  The detail score header comes from the list `Match` snapshot; only events/stream/recap
+  re-fetch on open (a live score can lag until the list is refreshed).
 - Round screen: list/reader content needs horizontal `contentPadding` or text clips on the curve.
 - Wear `HorizontalPageIndicator` forces itself to the bottom; the top dots are a custom Row.
 
@@ -90,3 +111,7 @@ suppressed in `gradle.properties`) · minSdk 33.
 - **R8 minify is OFF** (release is `isMinifyEnabled = false`). Enabling it shrinks the APK
   (faster installs) but needs keep-rules (model enums used via `valueOf`, Room, Coil; Jsoup
   has `-dontwarn`) + on-device testing. Parked.
+- **Matches auto-polling**: v1 is tap-to-refresh. The scoreboard JSON API + its `interval`
+  would drive live updates (and a live score in the detail header). Parked.
+- **Matches offline caching**: currently in-memory only. A `MatchEntity`/detail table (DB v3,
+  destructive migration) would make the section open offline like news. Parked.
