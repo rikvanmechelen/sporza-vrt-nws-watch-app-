@@ -15,4 +15,11 @@
     <string name="article_load_error">Kon artikel niet laden</string>
     <string name="open_on_phone">Open op telefoon</string>
     <string name="tile_latest">Laatste nieuws</string>
+    <string name="source_matches">Matches</string>
+    <string name="matches_load_error">Kon wedstrijden niet laden</string>
+    <string name="matches_empty">Geen wedstrijden</string>
+    <string name="match_load_error">Kon wedstrijd niet laden</string>
+    <string name="match_events">Belangrijke fases</string>
+    <string name="match_stream">Fase per fase</string>
+    <string name="match_recap">Verslag</string>
 </resources>

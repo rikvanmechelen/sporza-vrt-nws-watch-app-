@@ -26,8 +26,10 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.SwipeToDismissBox
 import androidx.wear.compose.material.SwipeToDismissValue
 import androidx.wear.compose.material.rememberSwipeToDismissBoxState
+import be.vanmechelen.vrtnws.data.MatchesRepository
 import be.vanmechelen.vrtnws.data.NewsRepository
 import be.vanmechelen.vrtnws.model.Article
+import be.vanmechelen.vrtnws.model.Match
 import be.vanmechelen.vrtnws.model.NewsSource
 import be.vanmechelen.vrtnws.ui.article.ArticleScreen
 import be.vanmechelen.vrtnws.ui.article.ArticleViewModel
@@ -35,7 +37,17 @@ import be.vanmechelen.vrtnws.ui.headlines.CategoriesScreen
 import be.vanmechelen.vrtnws.ui.headlines.CategorySelection
 import be.vanmechelen.vrtnws.ui.headlines.HeadlinesScreen
 import be.vanmechelen.vrtnws.ui.headlines.HeadlinesViewModel
+import be.vanmechelen.vrtnws.ui.matches.MatchDetailScreen
+import be.vanmechelen.vrtnws.ui.matches.MatchDetailViewModel
+import be.vanmechelen.vrtnws.ui.matches.MatchesScreen
+import be.vanmechelen.vrtnws.ui.matches.MatchesViewModel
 import be.vanmechelen.vrtnws.ui.theme.VrtNwsTheme
+
+/** A page in the top-level pager: one of the news feeds, or the Matches section. */
+private sealed interface PagerTab {
+    data class News(val source: NewsSource) : PagerTab
+    data object Matches : PagerTab
+}
 
 /**
  * List level = a horizontal pager over [NewsSource] (Nieuws / Kort / Sport); swipe left/right
@@ -43,19 +55,23 @@ import be.vanmechelen.vrtnws.ui.theme.VrtNwsTheme
  * the left edge to return to the list).
  */
 @Composable
-fun AppRoot(repository: NewsRepository) {
+fun AppRoot(repository: NewsRepository, matchesRepository: MatchesRepository) {
     VrtNwsTheme {
         val context = LocalContext.current
         var selected by remember { mutableStateOf<Article?>(null) }
         // Non-null while browsing a category of the Nieuws feed (see CategoriesScreen).
         var newsSelection by remember { mutableStateOf<CategorySelection?>(null) }
+        // Non-null while viewing a match detail.
+        var matchSelection by remember { mutableStateOf<Match?>(null) }
 
-        // Hoisted so the pager keeps its page across the reader / category-browsing screens.
-        val sources = NewsSource.entries
-        val pagerState = rememberPagerState(pageCount = { sources.size })
+        // Hoisted so the pager keeps its page across the reader / detail screens.
+        // Tabs = the news feeds (Kort / Sport / Nieuws) then Matches as the 4th page.
+        val tabs = remember { NewsSource.entries.map { PagerTab.News(it) } + PagerTab.Matches }
+        val pagerState = rememberPagerState(pageCount = { tabs.size })
 
         val current = selected
         val category = newsSelection
+        val match = matchSelection
         when {
             current != null -> {
                 val dismissState = rememberSwipeToDismissBoxState()
@@ -110,30 +126,73 @@ fun AppRoot(repository: NewsRepository) {
                 }
             }
 
+            match != null -> {
+                val dismissState = rememberSwipeToDismissBoxState()
+                LaunchedEffect(dismissState.currentValue) {
+                    if (dismissState.currentValue == SwipeToDismissValue.Dismissed) {
+                        matchSelection = null
+                        dismissState.snapTo(SwipeToDismissValue.Default)
+                    }
+                }
+                SwipeToDismissBox(state = dismissState) { isBackground ->
+                    if (isBackground) {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background))
+                    } else {
+                        val vm: MatchDetailViewModel = viewModel(
+                            key = match.detailUrl,
+                            factory = matchDetailViewModelFactory(matchesRepository, match.detailUrl),
+                        )
+                        MatchDetailScreen(
+                            viewModel = vm,
+                            match = match,
+                            onOpenOnPhone = { openOnPhone(context, it) },
+                        )
+                    }
+                }
+            }
+
             else -> {
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                        val src = sources[page]
-                        val vm: HeadlinesViewModel =
-                            viewModel(key = src.name, factory = headlinesViewModelFactory(repository, src))
                         val active = page == pagerState.currentPage
-                        if (src == NewsSource.NEWS_LATEST) {
-                            CategoriesScreen(
-                                viewModel = vm,
-                                onCategoryClick = { newsSelection = it },
-                                isActive = active,
-                            )
-                        } else {
-                            HeadlinesScreen(
-                                viewModel = vm,
-                                source = src,
-                                onArticleClick = { selected = it },
-                                isActive = active,
-                            )
+                        when (val tab = tabs[page]) {
+                            is PagerTab.News -> {
+                                val src = tab.source
+                                val vm: HeadlinesViewModel = viewModel(
+                                    key = src.name,
+                                    factory = headlinesViewModelFactory(repository, src),
+                                )
+                                if (src == NewsSource.NEWS_LATEST) {
+                                    CategoriesScreen(
+                                        viewModel = vm,
+                                        onCategoryClick = { newsSelection = it },
+                                        isActive = active,
+                                    )
+                                } else {
+                                    HeadlinesScreen(
+                                        viewModel = vm,
+                                        source = src,
+                                        onArticleClick = { selected = it },
+                                        isActive = active,
+                                    )
+                                }
+                            }
+
+                            PagerTab.Matches -> {
+                                val vm: MatchesViewModel = viewModel(
+                                    key = "matches",
+                                    factory = matchesViewModelFactory(matchesRepository),
+                                )
+                                MatchesScreen(
+                                    viewModel = vm,
+                                    onMatchClick = { matchSelection = it },
+                                    isActive = active,
+                                )
+                            }
                         }
                     }
                     TopPageIndicator(
-                        pageCount = sources.size,
+                        pageCount = tabs.size,
                         selectedPage = pagerState.currentPage,
                         modifier = Modifier
                             .align(Alignment.TopCenter)

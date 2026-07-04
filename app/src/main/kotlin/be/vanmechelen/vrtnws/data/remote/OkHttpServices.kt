@@ -2,8 +2,11 @@ package be.vanmechelen.vrtnws.data.remote
 
 import be.vanmechelen.vrtnws.data.ArticleService
 import be.vanmechelen.vrtnws.data.FeedService
+import be.vanmechelen.vrtnws.data.MatchesService
 import be.vanmechelen.vrtnws.model.Article
 import be.vanmechelen.vrtnws.model.ArticleContent
+import be.vanmechelen.vrtnws.model.Match
+import be.vanmechelen.vrtnws.model.MatchDetail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -33,4 +36,18 @@ class OkHttpArticleService(
 ) : ArticleService {
     override suspend fun fetchBody(url: String): ArticleContent =
         ArticleExtractor.extract(client.getText(url))
+}
+
+private const val KALENDER_URL = "https://sporza.be/nl/kalender"
+
+class OkHttpMatchesService(
+    private val client: OkHttpClient,
+) : MatchesService {
+    override suspend fun fetchCalendar(): List<Match> =
+        MatchCalendarParser.parse(client.getText(KALENDER_URL))
+
+    // The calendar links to /nl/sport/{sport}/~{id}/ which 302s to the full detail page;
+    // OkHttp follows redirects, so we can extract straight from the given url.
+    override suspend fun fetchDetail(url: String): MatchDetail =
+        MatchDetailExtractor.extract(client.getText(url))
 }

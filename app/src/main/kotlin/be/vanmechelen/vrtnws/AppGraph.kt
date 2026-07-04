@@ -1,12 +1,15 @@
 package be.vanmechelen.vrtnws
 
 import android.content.Context
+import be.vanmechelen.vrtnws.data.DefaultMatchesRepository
 import be.vanmechelen.vrtnws.data.DefaultNewsRepository
+import be.vanmechelen.vrtnws.data.MatchesRepository
 import be.vanmechelen.vrtnws.data.NewsRepository
 import be.vanmechelen.vrtnws.data.local.NewsDatabase
 import be.vanmechelen.vrtnws.data.local.RoomArticleCache
 import be.vanmechelen.vrtnws.data.remote.OkHttpArticleService
 import be.vanmechelen.vrtnws.data.remote.OkHttpFeedService
+import be.vanmechelen.vrtnws.data.remote.OkHttpMatchesService
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.concurrent.TimeUnit
@@ -31,5 +34,10 @@ class AppGraph(context: Context) {
         cache = cache,
         feedService = OkHttpFeedService(client),
         articleService = OkHttpArticleService(client),
+    )
+
+    // Matches use an in-memory cache (scores are ephemeral) — no Room involved.
+    val matchesRepository: MatchesRepository = DefaultMatchesRepository(
+        service = OkHttpMatchesService(client),
     )
 }
