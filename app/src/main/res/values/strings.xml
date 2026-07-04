@@ -2,6 +2,9 @@
 <resources>
     <string name="app_name">VRT NWS</string>
     <string name="headlines_title">VRT NWS</string>
+    <string name="source_news">Nieuws</string>
+    <string name="source_top">Kort</string>
+    <string name="source_sport">Sport</string>
     <string name="refresh">Vernieuwen</string>
     <string name="loading">Laden…</string>
     <string name="empty_headlines">Geen nieuws. Trek naar beneden om te vernieuwen.</string>

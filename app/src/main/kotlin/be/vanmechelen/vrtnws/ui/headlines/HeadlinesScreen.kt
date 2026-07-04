@@ -45,12 +45,15 @@ import coil.compose.AsyncImage
 @Composable
 fun HeadlinesScreen(
     viewModel: HeadlinesViewModel,
+    source: be.vanmechelen.vrtnws.model.NewsSource,
     onArticleClick: (Article) -> Unit,
+    isActive: Boolean = true,
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    // Only the visible pager page should own the rotary crown focus.
+    LaunchedEffect(isActive) { if (isActive) runCatching { focusRequester.requestFocus() } }
 
     when {
         ui.isInitialLoading -> CenteredProgress()
@@ -64,7 +67,7 @@ fun HeadlinesScreen(
         ) {
             item {
                 Text(
-                    text = androidx.compose.ui.res.stringResource(R.string.headlines_title),
+                    text = androidx.compose.ui.res.stringResource(source.labelRes),
                     style = MaterialTheme.typography.title3,
                     color = MaterialTheme.colors.primary,
                 )

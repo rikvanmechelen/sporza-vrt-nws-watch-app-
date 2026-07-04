@@ -10,8 +10,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 
-const val VRT_FEED_URL = "https://www.vrt.be/vrtnws/nl.rss.articles.xml"
-
 private const val USER_AGENT =
     "Mozilla/5.0 (Linux; Android 14; Pixel Watch) AppleWebKit/537.36 (KHTML, like Gecko) VrtNwsWear/1.0"
 
@@ -25,9 +23,8 @@ private suspend fun OkHttpClient.getText(url: String): String = withContext(Disp
 
 class OkHttpFeedService(
     private val client: OkHttpClient,
-    private val feedUrl: String = VRT_FEED_URL,
 ) : FeedService {
-    override suspend fun fetchHeadlines(): List<Article> =
+    override suspend fun fetchHeadlines(feedUrl: String): List<Article> =
         AtomFeedParser.parse(client.getText(feedUrl))
 }
 

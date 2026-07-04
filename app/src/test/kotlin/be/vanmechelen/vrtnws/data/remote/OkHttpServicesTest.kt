@@ -26,8 +26,8 @@ class OkHttpServicesTest {
     @Test
     fun feedServiceFetchesAndParses() = runTest {
         server.enqueue(MockResponse().setBody(fixture("feed_sample.xml")))
-        val service = OkHttpFeedService(client, server.url("/feed").toString())
-        val headlines = service.fetchHeadlines()
+        val service = OkHttpFeedService(client)
+        val headlines = service.fetchHeadlines(server.url("/feed").toString())
         assertTrue(headlines.size > 20)
         assertEquals("https://vrtnws.be/p.Wk6pRlL87", headlines.first().url)
     }
@@ -43,8 +43,8 @@ class OkHttpServicesTest {
     @Test
     fun httpErrorThrows() = runTest {
         server.enqueue(MockResponse().setResponseCode(500))
-        val service = OkHttpFeedService(client, server.url("/feed").toString())
-        val error = runCatching { service.fetchHeadlines() }.exceptionOrNull()
+        val service = OkHttpFeedService(client)
+        val error = runCatching { service.fetchHeadlines(server.url("/feed").toString()) }.exceptionOrNull()
         assertTrue("expected IOException, got $error", error is IOException)
     }
 }

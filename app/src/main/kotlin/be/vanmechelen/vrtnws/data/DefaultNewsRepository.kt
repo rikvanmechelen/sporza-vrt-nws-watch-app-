@@ -2,6 +2,7 @@ package be.vanmechelen.vrtnws.data
 
 import be.vanmechelen.vrtnws.model.Article
 import be.vanmechelen.vrtnws.model.ArticleContent
+import be.vanmechelen.vrtnws.model.NewsSource
 import kotlinx.coroutines.flow.Flow
 
 class DefaultNewsRepository(
@@ -10,19 +11,19 @@ class DefaultNewsRepository(
     private val articleService: ArticleService,
 ) : NewsRepository {
 
-    override fun headlines(): Flow<List<Article>> = cache.observeHeadlines()
+    override fun headlines(source: NewsSource): Flow<List<Article>> = cache.observeHeadlines(source)
 
-    override suspend fun refresh(): Result<Unit> = runCatching {
-        val fresh = feedService.fetchHeadlines()
-        cache.upsertHeadlines(fresh)
+    override suspend fun refresh(source: NewsSource): Result<Unit> = runCatching {
+        val fresh = feedService.fetchHeadlines(source.feedUrl)
+        cache.upsertHeadlines(source, fresh)
     }
 
-    override suspend fun body(id: String, url: String): Result<ArticleContent> = runCatching {
-        cache.cachedBody(id)?.let { return@runCatching it }
+    override suspend fun body(url: String): Result<ArticleContent> = runCatching {
+        cache.cachedBody(url)?.let { return@runCatching it }
         val content = articleService.fetchBody(url)
-        if (!content.isEmpty) cache.saveBody(id, content)
+        if (!content.isEmpty) cache.saveBody(url, content)
         content
     }
 
-    override suspend fun latestHeadline(): Article? = cache.latestHeadline()
+    override suspend fun latestHeadline(): Article? = cache.latestHeadline(NewsSource.NEWS_LATEST)
 }

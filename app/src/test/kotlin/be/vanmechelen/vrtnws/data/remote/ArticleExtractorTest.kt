@@ -56,4 +56,22 @@ class ArticleExtractorTest {
         assertTrue(ArticleExtractor.extract("").isEmpty)
         assertTrue(ArticleExtractor.extract("<html><body><nav>menu</nav></body></html>").isEmpty)
     }
+
+    @Test
+    fun sporzaRegularArticleBodyIsExtracted() {
+        // Sporza articles have no prose-article-* classes and no JSON-LD articleBody;
+        // the body lives in <p> tags inside the main container.
+        val content = extract("sporza_article.html")
+        assertFalse("expected Sporza body", content.isEmpty)
+        assertTrue(content.plainText.contains("Kaapverdië"))
+        // related "Lees meer" / "Gerelateerd" teasers must not dominate the body
+        assertTrue("expected several paragraphs, got ${content.blocks.size}", content.blocks.size >= 3)
+    }
+
+    @Test
+    fun sporzaMatchPageYieldsBodyViaJsonLd() {
+        // Live match pages carry text in JSON-LD liveBlogUpdate[].articleBody.
+        val content = extract("sporza_match.html")
+        assertFalse("expected match body via JSON-LD", content.isEmpty)
+    }
 }

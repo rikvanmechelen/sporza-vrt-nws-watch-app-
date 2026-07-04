@@ -8,6 +8,8 @@ Feed source: `https://www.vrt.be/vrtnws/nl.rss.articles.xml` (an **Atom** feed).
 
 ## Features
 
+- **Three sources in a horizontal pager** — swipe left/right between **Nieuws** (VRT NWS latest),
+  **Kort** (VRT NWS top headlines) and **Sport** (Sporza). Each is its own headline list.
 - Scrollable headline list with thumbnails and relative timestamps (rotary-crown + touch).
 - Native article reader — the article page is fetched and its body extracted/reformatted
   for the round screen; a **"Open op telefoon"** button hands off to the phone browser.
@@ -22,30 +24,38 @@ Single `:app` module, Kotlin + Jetpack Compose for Wear OS.
 ```
 data/
   remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services
-  local/  Room: ArticleEntity + BlockConverters, ArticleDao, NewsDatabase, RoomArticleCache
+  local/  Room: ArticleEntity (id+source) + ArticleBodyEntity (url) + BlockConverters,
+          ArticleDao, NewsDatabase, RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
-model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE)
-ui/       MainActivity, AppRoot (SwipeToDismissBox navigation), theme,
-          headlines/ (Screen + ViewModel), article/ (Screen + ViewModel)
+model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsSource (feeds)
+ui/       MainActivity, AppRoot (HorizontalPager over sources + SwipeToDismissBox reader), theme,
+          headlines/ (Screen + ViewModel, per-source), article/ (Screen + ViewModel)
 tile/         LatestHeadlineTileService (ProtoLayout)
 complication/ LatestHeadlineComplicationService
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
 
-**Data flow:** `OkHttpFeedService` → `AtomFeedParser` → `NewsRepository` upserts into Room
-and exposes a cache-first `Flow`. Opening an article returns the cached body if present,
-otherwise `OkHttpArticleService` fetches the page → `ArticleExtractor` parses it → cached.
+**Sources:** `NewsSource` enum holds the three Atom feed URLs (all parsed by the one
+`AtomFeedParser`). Headlines are cached per `(id, source)` — feeds overlap — while article
+bodies are cached once, keyed by `url`.
+
+**Data flow:** `OkHttpFeedService.fetchHeadlines(source.feedUrl)` → `AtomFeedParser` →
+`NewsRepository.refresh(source)` upserts into Room and `headlines(source)` exposes a cache-first
+`Flow`. Opening an article returns the cached body (by url) if present, otherwise
+`OkHttpArticleService` fetches the page → `ArticleExtractor` parses it → cached.
 
 ### Article extraction (the one fragile part)
 
 `ArticleExtractor` is the single place to adjust if VRT changes their site. It is layered:
 
-1. **DOM by `prose-article-*` classes** — primary; works for regular articles *and*
-   liveblogs. Paragraphs use `prose-article-body-r/-sb`; headings `prose-article-h2/-h3`;
+1. **DOM by `prose-article-*` classes** — primary for VRT NWS; works for regular articles
+   *and* liveblogs. Paragraphs use `prose-article-body-r/-sb`; headings `prose-article-h2/-h3`;
    quotes `prose-article-quote`. Byline/caption/tag variants (`-small-`, bare `-m`) and
    the page `h1` are excluded, which naturally drops sidebar noise ("Lees ook" etc.).
-2. **JSON-LD `articleBody` / `liveBlogUpdate[].articleBody`** — fallback.
-3. **Generic long-paragraph heuristic** — last resort.
+2. **JSON-LD `articleBody` / `liveBlogUpdate[].articleBody`** — fallback (Sporza live match pages).
+3. **Main-scoped `<p>`/`<h2>` heuristic** — catches sites without `prose-article-*` classes
+   (e.g. regular Sporza articles, whose body sits in `<p>` inside `mainBody`), scoped to the
+   main container to skip nav/related teasers; falls back to whole-document if needed.
 
 If all fail, the reader shows the "Open op telefoon" fallback.
 

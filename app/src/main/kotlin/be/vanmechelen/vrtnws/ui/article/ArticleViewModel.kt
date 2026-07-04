@@ -22,7 +22,6 @@ sealed interface ArticleUiState {
 
 class ArticleViewModel(
     private val repository: NewsRepository,
-    private val articleId: String,
     val articleUrl: String,
 ) : ViewModel() {
 
@@ -36,7 +35,7 @@ class ArticleViewModel(
     fun load() {
         viewModelScope.launch {
             _uiState.value = ArticleUiState.Loading
-            _uiState.value = repository.body(articleId, articleUrl).fold(
+            _uiState.value = repository.body(articleUrl).fold(
                 onSuccess = { ArticleUiState.Ready(it) },
                 onFailure = { ArticleUiState.Failed },
             )

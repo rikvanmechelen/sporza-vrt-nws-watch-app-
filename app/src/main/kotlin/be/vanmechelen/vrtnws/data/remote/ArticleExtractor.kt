@@ -27,7 +27,7 @@ object ArticleExtractor {
         val doc = Jsoup.parse(html)
         val blocks = fromProseClasses(doc)
             .ifEmpty { fromJsonLd(html) }
-            .ifEmpty { fromGenericParagraphs(doc) }
+            .ifEmpty { fromMainContent(doc) }
         return ArticleContent(blocks)
     }
 
@@ -62,14 +62,34 @@ object ArticleExtractor {
             .flatMap { body -> body.split("\n").asSequence() }
             .map { it.trim() }
             .filter { it.isNotBlank() }
+            // liveBlogUpdate arrays often repeat entries; keep first occurrence, preserve order.
+            .distinct()
             .map { ContentBlock(BlockType.PARAGRAPH, it) }
             .toList()
 
-    private fun fromGenericParagraphs(doc: Document): List<ContentBlock> =
-        doc.select("p")
-            .map { it.text().trim() }
-            .filter { it.length >= 40 }
-            .map { ContentBlock(BlockType.PARAGRAPH, it) }
+    // Sites without prose-article-* classes (e.g. Sporza) keep body text in plain <p>/<h2>
+    // inside a main container. Scope to it to skip nav/related teasers; fall back to the
+    // whole document if no recognisable container is found or scoping finds too little.
+    private fun fromMainContent(doc: Document): List<ContentBlock> {
+        val root = doc.selectFirst(
+            "[class*=mainBody], [class*=article-body], [class*=articleBody], article, main",
+        ) ?: doc.body() ?: return emptyList()
+        val scoped = paragraphsIn(root)
+        return if (scoped.size >= 2) scoped else paragraphsIn(doc.body() ?: root)
+    }
+
+    private fun paragraphsIn(root: Element): List<ContentBlock> =
+        root.select("p, h2, h3, blockquote").mapNotNull { el ->
+            val text = el.text().trim()
+            if (text.isBlank()) return@mapNotNull null
+            val type = when (el.tagName()) {
+                "h2", "h3" -> BlockType.HEADING
+                "blockquote" -> BlockType.QUOTE
+                else -> BlockType.PARAGRAPH
+            }
+            if (type == BlockType.PARAGRAPH && text.length < 40) return@mapNotNull null
+            ContentBlock(type, text)
+        }
 
     private fun unescapeJson(s: String): String {
         val sb = StringBuilder(s.length)

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import be.vanmechelen.vrtnws.data.NewsRepository
 import be.vanmechelen.vrtnws.model.Article
+import be.vanmechelen.vrtnws.model.NewsSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,13 +23,16 @@ data class HeadlinesUiState(
     val showError: Boolean get() = loadFailed && articles.isEmpty() && !isRefreshing
 }
 
-class HeadlinesViewModel(private val repository: NewsRepository) : ViewModel() {
+class HeadlinesViewModel(
+    private val repository: NewsRepository,
+    private val source: NewsSource,
+) : ViewModel() {
 
     private val isRefreshing = MutableStateFlow(false)
     private val loadFailed = MutableStateFlow(false)
 
     val uiState: StateFlow<HeadlinesUiState> =
-        combine(repository.headlines(), isRefreshing, loadFailed) { articles, refreshing, failed ->
+        combine(repository.headlines(source), isRefreshing, loadFailed) { articles, refreshing, failed ->
             HeadlinesUiState(articles = articles, isRefreshing = refreshing, loadFailed = failed)
         }.stateIn(
             scope = viewModelScope,
@@ -43,7 +47,7 @@ class HeadlinesViewModel(private val repository: NewsRepository) : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             isRefreshing.value = true
-            val result = repository.refresh()
+            val result = repository.refresh(source)
             loadFailed.value = result.isFailure
             isRefreshing.value = false
         }

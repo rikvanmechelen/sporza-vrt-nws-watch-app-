@@ -6,18 +6,25 @@ import androidx.room.TypeConverter
 import be.vanmechelen.vrtnws.model.BlockType
 import be.vanmechelen.vrtnws.model.ContentBlock
 
-@Entity(tableName = "articles")
+/** One headline row per (article, source) — feeds overlap, so both are needed as the key. */
+@Entity(tableName = "articles", primaryKeys = ["id", "source"])
 data class ArticleEntity(
-    @PrimaryKey val id: String,
+    val id: String,
+    val source: String,
     val title: String,
     val summary: String,
     val url: String,
     val imageUrl: String?,
     val publishedEpochMs: Long,
     val category: String?,
-    /** Extracted body, null until the article has been opened at least once. */
-    val body: List<ContentBlock>?,
-    val bodyFetchedEpochMs: Long?,
+)
+
+/** Extracted article body, cached once per url (source-independent). */
+@Entity(tableName = "article_bodies")
+data class ArticleBodyEntity(
+    @PrimaryKey val url: String,
+    val body: List<ContentBlock>,
+    val fetchedEpochMs: Long,
 )
 
 /** Serialises [ContentBlock] lists to a single delimited string for Room. */

@@ -2,6 +2,7 @@ package be.vanmechelen.vrtnws.ui.article
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,9 +50,16 @@ fun ArticleScreen(
         modifier = Modifier
             .fillMaxSize()
             .rotaryScrollable(RotaryScrollableDefaults.behavior(listState), focusRequester),
+        // Inset content so body text doesn't run into the round screen's curved edges.
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 32.dp),
     ) {
         item {
-            Text(text = title, style = MaterialTheme.typography.title3)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.title3,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         when (val state = ui) {
             is ArticleUiState.Loading -> item { CenteredProgress() }

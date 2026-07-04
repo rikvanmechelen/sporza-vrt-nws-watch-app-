@@ -7,6 +7,7 @@ import be.vanmechelen.vrtnws.model.Article
 import be.vanmechelen.vrtnws.model.ArticleContent
 import be.vanmechelen.vrtnws.model.BlockType
 import be.vanmechelen.vrtnws.model.ContentBlock
+import be.vanmechelen.vrtnws.model.NewsSource
 import be.vanmechelen.vrtnws.ui.article.ArticleUiState
 import be.vanmechelen.vrtnws.ui.article.ArticleViewModel
 import be.vanmechelen.vrtnws.ui.headlines.HeadlinesViewModel
@@ -27,9 +28,9 @@ private class FakeRepo : NewsRepository {
     val flow = MutableStateFlow<List<Article>>(emptyList())
     var refreshResult: Result<Unit> = Result.success(Unit)
     var bodyResult: Result<ArticleContent> = Result.success(ArticleContent(emptyList()))
-    override fun headlines(): Flow<List<Article>> = flow
-    override suspend fun refresh(): Result<Unit> = refreshResult
-    override suspend fun body(id: String, url: String): Result<ArticleContent> = bodyResult
+    override fun headlines(source: NewsSource): Flow<List<Article>> = flow
+    override suspend fun refresh(source: NewsSource): Result<Unit> = refreshResult
+    override suspend fun body(url: String): Result<ArticleContent> = bodyResult
     override suspend fun latestHeadline(): Article? = flow.value.firstOrNull()
 }
 
@@ -40,7 +41,7 @@ class ViewModelsTest {
     @Test
     fun headlinesRefreshOnInitAndExposesArticles() = runTest {
         val repo = FakeRepo()
-        val vm = HeadlinesViewModel(repo)
+        val vm = HeadlinesViewModel(repo, NewsSource.NEWS_LATEST)
         vm.uiState.test {
             awaitItem() // initial
             repo.flow.value = listOf(article("a"), article("b"))
@@ -58,7 +59,7 @@ class ViewModelsTest {
             flow.value = listOf(article("a"))
             refreshResult = Result.failure(RuntimeException("offline"))
         }
-        val vm = HeadlinesViewModel(repo)
+        val vm = HeadlinesViewModel(repo, NewsSource.NEWS_LATEST)
         vm.uiState.test {
             advanceUntilIdle()
             val state = expectMostRecentItem()
@@ -73,7 +74,7 @@ class ViewModelsTest {
         val repo = FakeRepo().apply {
             bodyResult = Result.success(ArticleContent(listOf(ContentBlock(BlockType.PARAGRAPH, "hi"))))
         }
-        val vm = ArticleViewModel(repo, "a", "https://x/a")
+        val vm = ArticleViewModel(repo, "https://x/a")
         vm.uiState.test {
             advanceUntilIdle()
             val state = expectMostRecentItem()
@@ -85,7 +86,7 @@ class ViewModelsTest {
     @Test
     fun articleFailedOnError() = runTest {
         val repo = FakeRepo().apply { bodyResult = Result.failure(RuntimeException("boom")) }
-        val vm = ArticleViewModel(repo, "a", "https://x/a")
+        val vm = ArticleViewModel(repo, "https://x/a")
         vm.uiState.test {
             advanceUntilIdle()
             assertTrue(expectMostRecentItem() is ArticleUiState.Failed)

@@ -58,6 +58,17 @@ class AtomFeedParserTest {
     }
 
     @Test
+    fun parsesSporzaFeedTheSameWay() {
+        // Sporza is a structurally identical Atom feed on a different host, with pipe-delimited
+        // nstag (first token = sport). The same parser must handle it.
+        val sporza = AtomFeedParser.parse(fixture("sporza_feed.xml"))
+        assertTrue("expected Sporza entries", sporza.size >= 10)
+        val first = sporza.first()
+        assertTrue(first.url.startsWith("https://sporza.be/"))
+        assertTrue("expected a sport nstag", sporza.any { it.category?.startsWith("voetbal") == true || it.category?.contains("|") == true })
+    }
+
+    @Test
     fun everyArticleHasStableIdAndUrl() {
         articles.forEach {
             assertTrue("blank id", it.id.isNotBlank())
