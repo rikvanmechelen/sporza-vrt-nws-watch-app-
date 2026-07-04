@@ -51,12 +51,16 @@ fun HeadlinesScreen(
     source: be.vanmechelen.vrtnws.model.NewsSource,
     onArticleClick: (Article) -> Unit,
     isActive: Boolean = true,
+    /** When non-null, show only this category's articles and use its name as the header. */
+    selection: CategorySelection? = null,
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
     // Only the visible pager page should own the rotary crown focus.
     LaunchedEffect(isActive) { if (isActive) runCatching { focusRequester.requestFocus() } }
+
+    val articles = if (selection == null) ui.articles else ui.articles.filter(selection::matches)
 
     when {
         ui.isInitialLoading -> CenteredProgress()
@@ -70,6 +74,11 @@ fun HeadlinesScreen(
         ) {
             item {
                 val refreshLabel = androidx.compose.ui.res.stringResource(R.string.refresh)
+                val headerText = when (selection) {
+                    null, CategorySelection.All -> androidx.compose.ui.res.stringResource(source.labelRes)
+                    is CategorySelection.Topic ->
+                        selection.name ?: androidx.compose.ui.res.stringResource(R.string.category_other)
+                }
                 Row(
                     modifier = Modifier
                         .clickable(onClick = viewModel::refresh)
@@ -78,7 +87,7 @@ fun HeadlinesScreen(
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        text = androidx.compose.ui.res.stringResource(source.labelRes),
+                        text = headerText,
                         style = MaterialTheme.typography.title3,
                         color = MaterialTheme.colors.primary,
                     )
@@ -104,7 +113,7 @@ fun HeadlinesScreen(
                     )
                 }
             }
-            items(ui.articles, key = { it.id }) { article ->
+            items(articles, key = { it.id }) { article ->
                 HeadlineCard(article, onClick = { onArticleClick(article) })
             }
         }

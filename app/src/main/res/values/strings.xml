@@ -3,6 +3,8 @@
     <string name="app_name">VRT NWS</string>
     <string name="headlines_title">VRT NWS</string>
     <string name="source_news">Nieuws</string>
+    <string name="category_all">Alles</string>
+    <string name="category_other">Overig</string>
     <string name="source_top">Kort</string>
     <string name="source_sport">Sport</string>
     <string name="refresh">Vernieuwen</string>
