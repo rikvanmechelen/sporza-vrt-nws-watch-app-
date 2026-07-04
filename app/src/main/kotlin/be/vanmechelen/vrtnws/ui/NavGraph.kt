@@ -49,13 +49,24 @@ private sealed interface PagerTab {
     data object Matches : PagerTab
 }
 
+/** The pager tabs: the news feeds (in [NewsSource] order) then Matches as the last page. */
+private val PAGER_TABS: List<PagerTab> =
+    NewsSource.entries.map { PagerTab.News(it) } + PagerTab.Matches
+
+/** Index of the Matches page — used by the sports Tile's deep-link. */
+val MATCHES_TAB_INDEX: Int = PAGER_TABS.lastIndex
+
 /**
  * List level = a horizontal pager over [NewsSource] (Nieuws / Kort / Sport); swipe left/right
  * to switch source. Selecting an article opens the reader in a [SwipeToDismissBox] (swipe from
  * the left edge to return to the list).
  */
 @Composable
-fun AppRoot(repository: NewsRepository, matchesRepository: MatchesRepository) {
+fun AppRoot(
+    repository: NewsRepository,
+    matchesRepository: MatchesRepository,
+    initialTab: Int = 0,
+) {
     VrtNwsTheme {
         val context = LocalContext.current
         var selected by remember { mutableStateOf<Article?>(null) }
@@ -66,8 +77,11 @@ fun AppRoot(repository: NewsRepository, matchesRepository: MatchesRepository) {
 
         // Hoisted so the pager keeps its page across the reader / detail screens.
         // Tabs = the news feeds (Kort / Sport / Nieuws) then Matches as the 4th page.
-        val tabs = remember { NewsSource.entries.map { PagerTab.News(it) } + PagerTab.Matches }
-        val pagerState = rememberPagerState(pageCount = { tabs.size })
+        val tabs = PAGER_TABS
+        val pagerState = rememberPagerState(
+            initialPage = initialTab.coerceIn(0, tabs.lastIndex),
+            pageCount = { tabs.size },
+        )
 
         val current = selected
         val category = newsSelection

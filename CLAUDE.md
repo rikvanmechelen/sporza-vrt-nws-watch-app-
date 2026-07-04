@@ -6,7 +6,7 @@ Guidance for working in this repo. See `README.md` for the user-facing overview.
 
 A standalone **Wear OS** app (built for the Pixel Watch 4) that browses VRT NWS / Sporza
 headlines, reads full articles natively on-wrist, and follows live Sporza match scores —
-with offline caching, a Tile, and a complication. Kotlin + Jetpack Compose for Wear, single
+with offline caching, two Tiles, and a complication. Kotlin + Jetpack Compose for Wear, single
 `:app` module, manual DI.
 
 ## Workflow (important — the user's stated preference)
@@ -60,7 +60,8 @@ model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsS
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
           article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
-tile/ · complication/     glanceable latest headline
+tile/     LatestHeadlineTileService + MatchesTileService (glances); MatchesTileModel (pure selector)
+complication/             glanceable latest headline
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
 
@@ -99,6 +100,19 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   re-fetch on open (a live score can lag until the list is refreshed).
 - Round screen: list/reader content needs horizontal `contentPadding` or text clips on the curve.
 - Wear `HorizontalPageIndicator` forces itself to the bottom; the top dots are a custom Row.
+- **Tiles don't scroll** — ProtoLayout has no `LazyColumn`. `MatchesTileService` shows a fixed
+  `Column` of up to 3 live matches + a "+N meer" overflow line and funnels the rest into the app;
+  the real scrollable list is the Matches tab. The row-selection logic is the pure
+  `matchesTileModel()` (+ `matchRowLabel()`) in `MatchesTileModel.kt` — unit-tested, keep it
+  Android-free.
+- **Matches tile refreshes over the network on each tile request** — unlike the headline tile,
+  which reads Room instantly, `matchesRepository` is in-memory and starts empty, so the tile
+  calls `refresh()` then reads `matches().first()`. Requests a 1-min freshness interval (Wear
+  throttles it), so it's "current score", not live-ticking.
+- **Tile → tab deep-link**: `MatchesTileService`'s `LaunchAction` sets the `tab=matches` extra
+  (`MainActivity.EXTRA_TAB`); `MainActivity` maps it to `MATCHES_TAB_INDEX` (defined in
+  `NavGraph.kt` as the pager's last page) → `AppRoot(initialTab=…)`. No extra ⇒ tab 0, so the
+  headline tile is unaffected.
 
 ## Versions (pinned for stability)
 

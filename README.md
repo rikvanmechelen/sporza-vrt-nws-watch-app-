@@ -2,7 +2,7 @@
 
 A standalone Wear OS app (built for the Pixel Watch 4) that lists the latest VRT NWS
 headlines, lets you read the full article natively on-wrist, and follows live Sporza
-match scores — with offline caching, a Tile, and a watch-face complication.
+match scores — with offline caching, two Tiles, and a watch-face complication.
 
 Feed source: `https://www.vrt.be/vrtnws/nl.rss.articles.xml` (an **Atom** feed).
 Live scores come from the Sporza calendar (`https://sporza.be/nl/kalender`, scraped HTML).
@@ -22,7 +22,10 @@ Live scores come from the Sporza calendar (`https://sporza.be/nl/kalender`, scra
   (they are ephemeral) and refreshed on demand.
 - **Tap the section title** to force-refresh that page. Swipe from the left edge returns from
   an article or match detail to the list.
-- **Tile** and **complication** showing the latest headline, tap to open the app.
+- Two **Tiles** — a *latest headline* glance and a *live scores* glance (up to 3 live
+  matches, football first, with a "+N meer" overflow; falls back to the next upcoming match
+  when nothing is live) — plus a **complication** showing the latest headline. Tapping a tile
+  opens the app; the live-scores tile deep-links straight to the Matches page.
 
 ## Architecture
 
@@ -41,7 +44,8 @@ model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsS
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
           article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
-tile/         LatestHeadlineTileService (ProtoLayout)
+tile/         LatestHeadlineTileService + MatchesTileService (ProtoLayout);
+              MatchesTileModel (pure selector: live-first, next-upcoming fallback)
 complication/ LatestHeadlineComplicationService
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
@@ -120,8 +124,9 @@ adb connect <watch-ip:debug-port>
 ./gradlew :app:installDebug
 ```
 
-Add the **Tile** (swipe the tile carousel → `+` → VRT NWS) and the **complication**
-(long-press watch face → Edit → pick a slot → VRT NWS) from the watch UI.
+Add a **Tile** (swipe the tile carousel → `+` → VRT NWS: *Laatste nieuws* or *Live scores*)
+and the **complication** (long-press watch face → Edit → pick a slot → VRT NWS) from the
+watch UI.
 
 ## Notes
 

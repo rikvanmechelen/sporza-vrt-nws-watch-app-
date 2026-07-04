@@ -15,6 +15,9 @@
     <string name="article_load_error">Kon artikel niet laden</string>
     <string name="open_on_phone">Open op telefoon</string>
     <string name="tile_latest">Laatste nieuws</string>
+    <string name="tile_matches">Live scores</string>
+    <string name="tile_matches_empty">Geen live wedstrijden</string>
+    <string name="tile_matches_more">+%d meer →</string>
     <string name="source_matches">Matches</string>
     <string name="matches_load_error">Kon wedstrijden niet laden</string>
     <string name="matches_empty">Geen wedstrijden</string>
