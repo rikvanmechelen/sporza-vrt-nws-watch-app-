@@ -20,11 +20,26 @@ android {
 
     buildTypes {
         release {
+            // Personal sideload: sign release with the debug key so `installRelease` works.
+            // debuggable is false here (unlike debug) -> ART fully optimises, which is the
+            // main reason release scrolling is dramatically smoother than debug.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+
+    // Per-ABI APKs: the watch is armeabi-v7a, the emulator x86_64. Splitting keeps each
+    // installed APK small (much faster Wi-Fi installs than a universal all-ABI APK).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = false
         }
     }
 

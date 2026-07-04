@@ -1,10 +1,15 @@
 package be.vanmechelen.vrtnws.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,11 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.wear.compose.material.HorizontalPageIndicator
 import androidx.wear.compose.material.MaterialTheme
-import androidx.wear.compose.material.PageIndicatorState
 import androidx.wear.compose.material.SwipeToDismissBox
 import androidx.wear.compose.material.SwipeToDismissValue
 import androidx.wear.compose.material.rememberSwipeToDismissBoxState
@@ -45,13 +50,6 @@ fun AppRoot(repository: NewsRepository) {
         if (current == null) {
             val sources = NewsSource.entries
             val pagerState = rememberPagerState(pageCount = { sources.size })
-            val pageIndicatorState = remember(pagerState) {
-                object : PageIndicatorState {
-                    override val pageOffset: Float get() = pagerState.currentPageOffsetFraction
-                    override val selectedPage: Int get() = pagerState.currentPage
-                    override val pageCount: Int get() = pagerState.pageCount
-                }
-            }
             Box(Modifier.fillMaxSize()) {
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                     val src = sources[page]
@@ -64,9 +62,12 @@ fun AppRoot(repository: NewsRepository) {
                         isActive = page == pagerState.currentPage,
                     )
                 }
-                HorizontalPageIndicator(
-                    pageIndicatorState = pageIndicatorState,
-                    modifier = Modifier.align(Alignment.TopCenter),
+                TopPageIndicator(
+                    pageCount = sources.size,
+                    selectedPage = pagerState.currentPage,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 6.dp),
                 )
             }
         } else {
@@ -92,6 +93,30 @@ fun AppRoot(repository: NewsRepository) {
                     )
                 }
             }
+        }
+    }
+}
+
+/** A small row of dots at the top showing how many source pages there are and which is active. */
+@Composable
+private fun TopPageIndicator(pageCount: Int, selectedPage: Int, modifier: Modifier = Modifier) {
+    if (pageCount <= 1) return
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(pageCount) { index ->
+            val active = index == selectedPage
+            Box(
+                Modifier
+                    .size(if (active) 7.dp else 5.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (active) MaterialTheme.colors.onBackground
+                        else MaterialTheme.colors.onSurfaceVariant.copy(alpha = 0.4f),
+                    ),
+            )
         }
     }
 }

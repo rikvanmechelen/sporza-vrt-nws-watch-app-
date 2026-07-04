@@ -128,7 +128,9 @@ private fun HeadlineCard(article: Article, onClick: () -> Unit) {
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val time = DateUtils.getRelativeTimeSpanString(article.publishedEpochMs).toString()
+                val time = remember(article.publishedEpochMs) {
+                    DateUtils.getRelativeTimeSpanString(article.publishedEpochMs).toString()
+                }
                 Text(
                     text = time,
                     style = MaterialTheme.typography.caption3,
