@@ -22,10 +22,11 @@ Live scores come from the Sporza calendar (`https://sporza.be/nl/kalender`, scra
   (they are ephemeral) and refreshed on demand.
 - **Tap the section title** to force-refresh that page. Swipe from the left edge returns from
   an article or match detail to the list.
-- Two **Tiles** — a *latest headline* glance and a *live scores* glance (up to 3 live
-  matches, football first, with a "+N meer" overflow; falls back to the next upcoming match
-  when nothing is live) — plus a **complication** showing the latest headline. Tapping a tile
-  opens the app; the live-scores tile deep-links straight to the Matches page.
+- Two **Tiles** — a *latest headline* glance and a *live scores* glance — plus a
+  **complication** showing the latest headline. The live-scores tile is a scoreboard of up to
+  3 live matches (football first): a sport emoji, home/away, and the score as the accented hero;
+  it shows a "+N meer" overflow and falls back to the next upcoming match when nothing is live.
+  Tapping a tile opens the app; the live-scores tile deep-links straight to the Matches page.
 
 ## Architecture
 
@@ -44,8 +45,8 @@ model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsS
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
           article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
-tile/         LatestHeadlineTileService + MatchesTileService (ProtoLayout);
-              MatchesTileModel (pure selector: live-first, next-upcoming fallback)
+tile/         LatestHeadlineTileService + MatchesTileService (ProtoLayout); MatchesTileModel
+              (pure: live-first selector + dedup, sportEmoji, matchMidText)
 complication/ LatestHeadlineComplicationService
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
@@ -83,9 +84,14 @@ extractors, and cached in memory (`DefaultMatchesRepository`) since scores are e
 
 - **List** — `MatchCalendarParser` parses `https://sporza.be/nl/kalender`. Each match is a
   `<a>` scoreboard whose href (`/nl/sport/{sport}/~{id}/`) gives the sport; matches are
-  grouped voetbal-first. Scoreboard markup differs per sport (football = teams + goal score,
-  tennis = players with the score only in the a11y text, cycling = no teams), so
-  `Match.home/away/score` are nullable and `Match.title` is the always-present fallback.
+  grouped voetbal-first and de-duplicated (Sporza repeats featured fixtures). Scoreboard markup
+  differs per sport, so `Match.home/away/score` are nullable and `Match.title` is the
+  always-present fallback:
+  - **football** = two `teamname` blocks (with logos) + a goal score (`3 - 2`);
+  - **tennis** = two `setsPlayer` sides (singles one name, doubles two per side); the score is
+    sets won (`1 - 2`) with the current set's games in `Match.subScore` (`4-3`), read from the
+    `_set_` game spans — the tile shows those games as a subscript on each set count;
+  - **cycling / no-team sports** = neither, so only `Match.title` renders.
 - **Detail** — `MatchDetailExtractor` parses the match page into three regions: quick events
   from the field-timeline widget (pre-formatted "29' - Doelpunt - …"), the **"Fase per fase"**
   live stream (`.sw-timeline-item`), and the editorial recap (article prose, excluding the

@@ -60,7 +60,8 @@ model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsS
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
           article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
-tile/     LatestHeadlineTileService + MatchesTileService (glances); MatchesTileModel (pure selector)
+tile/     LatestHeadlineTileService + MatchesTileService (glances); MatchesTileModel (pure:
+          live-first selector + dedup, sportEmoji, matchMidText)
 complication/             glanceable latest headline
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
@@ -91,8 +92,13 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 - **Match parsers** (`MatchCalendarParser` / `MatchDetailExtractor`) are the place to tune if
   Sporza changes. Sporza uses **hashed CSS-module class names** (`_scoreboard_mdatp_36`), so
   match on `[class*=prefix]`, never exact names (stable non-hashed classes: `.sw-timeline`,
-  `.sw-timeline-item`). Scoreboard markup differs per sport (football teams+score, tennis
-  set-columns, cycling no teams) → `Match.home/away/score` nullable, `Match.title` the fallback.
+  `.sw-timeline-item`). Scoreboard markup differs per sport → `Match.home/away/score` nullable,
+  `Match.title` the fallback: football = `teamname` blocks + goal score (`[class*=numbers]`);
+  tennis = two `setsPlayer` sides (names via `[class*=name]`.ownText, dropping the `playername`
+  wrapper + ranking `meta`), score = **sets won** with the live set's games in `Match.subScore`
+  from the `_set_` spans (note the delimited `_set_`/`_sets_` vs `setsPlayer`/`setsPlayers`);
+  cycling = no teams. The calendar is also `distinctBy { detailUrl }` — Sporza repeats featured
+  fixtures — and the tile additionally dedups by `id` (catches url-variant repeats).
   Detail regions: field-timeline `[class*=hoverLabel]` (events), `.sw-timeline-item` (stream),
   article prose minus live widgets (recap). A live-scoreboard JSON API exists
   (`api.sporza.be/web/content/{sport}/matches/{id}`, poll `interval`) but is unused.
@@ -101,10 +107,14 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 - Round screen: list/reader content needs horizontal `contentPadding` or text clips on the curve.
 - Wear `HorizontalPageIndicator` forces itself to the bottom; the top dots are a custom Row.
 - **Tiles don't scroll** — ProtoLayout has no `LazyColumn`. `MatchesTileService` shows a fixed
-  `Column` of up to 3 live matches + a "+N meer" overflow line and funnels the rest into the app;
-  the real scrollable list is the Matches tab. The row-selection logic is the pure
-  `matchesTileModel()` (+ `matchRowLabel()`) in `MatchesTileModel.kt` — unit-tested, keep it
-  Android-free.
+  `Column` of up to 3 live matches as scoreboard rows (sport emoji · home · accented score ·
+  away) + a "+N meer" overflow line, and funnels the rest into the app; the real scrollable list
+  is the Matches tab. The pure, Android-free, unit-tested logic lives in `MatchesTileModel.kt`:
+  `matchesTileModel()` (selector + dedup), `matchMidText()` (score-or-status), `sportEmoji()`.
+  Tennis renders the games as a subscript on each set count ("2₄-1₄") by splitting `score`/
+  `subScore`; ProtoLayout has no real subscript, so it's a smaller bottom-aligned run.
+- **Matches list `LazyColumn` keys must be unique** — key match cards by `detailUrl`, not
+  `Match.id` (ids repeat when Sporza lists a fixture twice; duplicate keys crash on scroll).
 - **Matches tile refreshes over the network on each tile request** — unlike the headline tile,
   which reads Room instantly, `matchesRepository` is in-memory and starts empty, so the tile
   calls `refresh()` then reads `matches().first()`. Requests a 1-min freshness interval (Wear
