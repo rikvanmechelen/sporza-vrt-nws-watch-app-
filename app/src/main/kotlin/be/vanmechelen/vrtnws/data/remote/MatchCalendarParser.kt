@@ -88,28 +88,48 @@ object MatchCalendarParser {
     )
 
     private fun teams(anchor: Element): Teams {
+        // Football / basketball: named team blocks (with logos).
         val teamEls = anchor.select("[class*=teamname]")
-        // Each side's display name lives in a `[class*=name]` that is NOT the teamname wrapper
-        // itself (the wrapper's own class also contains "name"). Doubles have >1 name per side.
-        fun namesIn(el: Element): String? = el.select("[class*=name]")
-            .filter { !it.className().contains("teamname") }
-            .mapNotNull { it.text().trim().takeIf(String::isNotBlank) }
-            .distinct()
-            .joinToString(" / ")
-            .takeIf { it.isNotBlank() }
+        if (teamEls.isNotEmpty()) {
+            // Each side's display name lives in a `[class*=name]` that is NOT the teamname wrapper
+            // itself (the wrapper's own class also contains "name"). Doubles have >1 name per side.
+            fun namesIn(el: Element): String? = el.select("[class*=name]")
+                .filter { !it.className().contains("teamname") }
+                .mapNotNull { it.text().trim().takeIf(String::isNotBlank) }
+                .distinct()
+                .joinToString(" / ")
+                .takeIf { it.isNotBlank() }
 
-        fun logoIn(el: Element): String? =
-            el.selectFirst("img[src]")?.attr("src")?.trim()?.takeIf { it.isNotBlank() }?.let(::normalizeUrl)
+            val homeEl = teamEls.firstOrNull { it.className().contains("home") } ?: teamEls.getOrNull(0)
+            val awayEl = teamEls.firstOrNull { it.className().contains("away") } ?: teamEls.getOrNull(1)
+            return Teams(
+                home = homeEl?.let(::namesIn),
+                homeLogo = homeEl?.let(::logoIn),
+                away = awayEl?.let(::namesIn),
+                awayLogo = awayEl?.let(::logoIn),
+            )
+        }
 
-        val homeEl = teamEls.firstOrNull { it.className().contains("home") } ?: teamEls.getOrNull(0)
-        val awayEl = teamEls.firstOrNull { it.className().contains("away") } ?: teamEls.getOrNull(1)
-        return Teams(
-            home = homeEl?.let(::namesIn),
-            homeLogo = homeEl?.let(::logoIn),
-            away = awayEl?.let(::namesIn),
-            awayLogo = awayEl?.let(::logoIn),
-        )
+        // Tennis: two `setsPlayer` sides (the plural `setsPlayers` is the wrapper). Singles have
+        // one name per side, doubles two. Each name is a `[class*=name]` (not the `playername`
+        // wrapper); use ownText so the trailing ranking `[class*=meta]` span is left out.
+        val sides = anchor.select("[class*=setsPlayer]")
+            .filter { !it.className().contains("setsPlayers") }
+        if (sides.size >= 2) {
+            fun playersIn(el: Element): String? = el.select("[class*=name]")
+                .filter { !it.className().contains("playername") }
+                .mapNotNull { it.ownText().trim().takeIf(String::isNotBlank) }
+                .distinct()
+                .joinToString(" / ")
+                .takeIf { it.isNotBlank() }
+            return Teams(playersIn(sides[0]), null, playersIn(sides[1]), null)
+        }
+
+        return Teams(null, null, null, null)
     }
+
+    private fun logoIn(el: Element): String? =
+        el.selectFirst("img[src]")?.attr("src")?.trim()?.takeIf { it.isNotBlank() }?.let(::normalizeUrl)
 
     private fun statusOf(scoreClass: String?, hidden: String, live: Boolean): MatchStatus = when {
         live -> MatchStatus.LIVE

@@ -27,9 +27,9 @@ import kotlinx.coroutines.guava.future
 import java.util.concurrent.TimeUnit
 
 private const val RES_VERSION = "1"
-private const val LIVE_RED = 0xFFE53935.toInt()
 private const val WHITE = 0xFFFFFFFF.toInt()
 private const val DIM = 0xFFB0B0B0.toInt()
+private const val YELLOW = 0xFFFFD200.toInt() // VRT yellow — the score accent
 
 /**
  * A Tile showing live Sporza match scores (up to 3, voetbal-first), or the next upcoming match
@@ -154,7 +154,11 @@ class MatchesTileService : TileService() {
             .build()
     }
 
-    /** One compact score/status line, with a red dot when live. */
+    /**
+     * A structured scoreboard row: sport emoji · home (right-aligned) · the accented score/status ·
+     * away (left-aligned). Names ellipsize; the score is the visual hero (bold, VRT yellow when
+     * live). Sports without two sides (e.g. cycling) collapse to emoji · title · status.
+     */
     private fun matchRow(match: Match, isLive: Boolean): LayoutElementBuilders.LayoutElement {
         val row = LayoutElementBuilders.Row.Builder()
             .setWidth(expand())
@@ -163,42 +167,55 @@ class MatchesTileService : TileService() {
                 ModifiersBuilders.Modifiers.Builder()
                     .setPadding(
                         ModifiersBuilders.Padding.Builder()
-                            .setTop(dp(2f)).setBottom(dp(2f)).build(),
+                            .setTop(dp(3f)).setBottom(dp(3f)).build(),
                     )
                     .build(),
             )
 
-        if (isLive) {
-            row.addContent(liveDot())
-            row.addContent(spacer(4f))
-        }
         row.addContent(
-            Text.Builder(this, matchRowLabel(match, isLive))
+            Text.Builder(this, sportEmoji(match.sportSlug))
                 .setTypography(Typography.TYPOGRAPHY_BODY2)
                 .setColor(argb(WHITE))
                 .setMaxLines(1)
-                .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                 .build(),
         )
+        row.addContent(spacer(5f))
+
+        val score = scoreText(matchMidText(match, isLive), if (isLive) YELLOW else WHITE)
+        if (match.home != null || match.away != null) {
+            row.addContent(nameCell(match.home.orEmpty(), LayoutElementBuilders.HORIZONTAL_ALIGN_END))
+            row.addContent(spacer(6f))
+            row.addContent(score)
+            row.addContent(spacer(6f))
+            row.addContent(nameCell(match.away.orEmpty(), LayoutElementBuilders.HORIZONTAL_ALIGN_START))
+        } else {
+            row.addContent(nameCell(match.title, LayoutElementBuilders.HORIZONTAL_ALIGN_START))
+            row.addContent(spacer(6f))
+            row.addContent(score)
+        }
         return row.build()
     }
 
-    private fun liveDot(): LayoutElementBuilders.LayoutElement =
+    /** An expanding, single-line, ellipsized team/player name aligned to one edge. */
+    private fun nameCell(name: String, align: Int): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Box.Builder()
-            .setWidth(dp(6f))
-            .setHeight(dp(6f))
-            .setModifiers(
-                ModifiersBuilders.Modifiers.Builder()
-                    .setBackground(
-                        ModifiersBuilders.Background.Builder()
-                            .setColor(argb(LIVE_RED))
-                            .setCorner(
-                                ModifiersBuilders.Corner.Builder().setRadius(dp(3f)).build(),
-                            )
-                            .build(),
-                    )
+            .setWidth(expand())
+            .setHorizontalAlignment(align)
+            .addContent(
+                Text.Builder(this, name)
+                    .setTypography(Typography.TYPOGRAPHY_BODY2)
+                    .setColor(argb(DIM))
+                    .setMaxLines(1)
+                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
                     .build(),
             )
+            .build()
+
+    private fun scoreText(text: String, color: Int): LayoutElementBuilders.LayoutElement =
+        Text.Builder(this, text)
+            .setTypography(Typography.TYPOGRAPHY_TITLE3)
+            .setColor(argb(color))
+            .setMaxLines(1)
             .build()
 
     private fun spacer(width: Float): LayoutElementBuilders.LayoutElement =

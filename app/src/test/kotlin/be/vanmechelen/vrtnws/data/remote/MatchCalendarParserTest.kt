@@ -71,6 +71,21 @@ class MatchCalendarParserTest {
     }
 
     @Test
+    fun tennisSinglesParsesBothPlayers() {
+        val m = matches.first { it.home == "Jasmine Paolini" }
+        assertEquals("Maria Sakkari", m.away)
+        assertEquals("tennis", m.sportSlug)
+        assertEquals("Jasmine Paolini - Maria Sakkari", m.title)
+    }
+
+    @Test
+    fun tennisDoublesJoinsPlayersPerSide() {
+        val doubles = matches.firstOrNull { it.sportSlug == "tennis" && it.home?.contains(" / ") == true }
+        assertNotNull("expected a doubles match with two players a side", doubles)
+        assertTrue("away side also has two players", doubles!!.away?.contains(" / ") == true)
+    }
+
+    @Test
     fun everyMatchHasStableIdSportAndUrl() {
         matches.forEach {
             assertTrue("blank id", it.id.isNotBlank())

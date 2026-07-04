@@ -43,20 +43,24 @@ fun matchesTileModel(matches: List<Match>, maxRows: Int = 3): MatchesTileModel {
 }
 
 /**
- * Compact one-line label for a Tile row: score-first when live/available, plus a short team hint.
- * Falls back to the always-present [Match.title]. Kickoff time ([Match.statusText]) leads the
- * upcoming fallback.
+ * The accented "hero" cell of a row: the goal/points score when the scoreboard exposes one
+ * (e.g. "3 - 2"), otherwise the short status — a live minute/phase ("45'", "1e set", "live") or,
+ * for the upcoming fallback, the kickoff time ("20:45").
  */
-fun matchRowLabel(match: Match, isLive: Boolean): String {
-    val teams = if (match.home != null && match.away != null) {
-        "${match.home} - ${match.away}"
-    } else {
-        match.title
-    }
-    val lead = if (isLive) {
-        match.score ?: match.statusText.ifBlank { "live" }
-    } else {
-        match.statusText.ifBlank { "gepland" } // upcoming: kickoff time
-    }
-    return "$lead  $teams"
+fun matchMidText(match: Match, isLive: Boolean): String =
+    match.score ?: match.statusText.ifBlank { if (isLive) "live" else "gepland" }
+
+/** Emoji that stands in for a sport, so a row reads at a glance without leaning on names. */
+fun sportEmoji(sportSlug: String): String = when (sportSlug) {
+    "voetbal" -> "⚽"
+    "tennis" -> "🎾"
+    "wielrennen", "veldrijden" -> "🚴"
+    // Motorsport: a formula car for circuit racing, a road car for rally.
+    "formule-1", "formule-2", "formule-e" -> "🏎"
+    "rally", "rallycross", "rally-raid", "wrc" -> "🚗"
+    "basketbal" -> "🏀"
+    "atletiek" -> "🏃"
+    "volleybal" -> "🏐"
+    "hockey" -> "🏑"
+    else -> "🏅"
 }

@@ -114,26 +114,39 @@ class MatchesTileModelTest {
     }
 
     @Test
-    fun liveRowLabelLeadsWithScore() {
-        val m = match("a", status = MatchStatus.LIVE).copy(
-            home = "Club Brugge", away = "Anderlecht", score = "2 - 1", statusText = "45'",
-        )
-        assertEquals("2 - 1  Club Brugge - Anderlecht", matchRowLabel(m, isLive = true))
+    fun midTextIsScoreWhenPresent() {
+        val m = match("a", status = MatchStatus.LIVE).copy(score = "2 - 1", statusText = "45'")
+        assertEquals("2 - 1", matchMidText(m, isLive = true))
     }
 
     @Test
-    fun liveRowLabelWithoutScoreUsesStatusText() {
-        val m = match("a", status = MatchStatus.LIVE).copy(
-            home = null, away = null, score = null, statusText = "3e ronde", title = "Wielrennen",
-        )
-        assertEquals("3e ronde  Wielrennen", matchRowLabel(m, isLive = true))
+    fun midTextFallsBackToStatusThenLive() {
+        val withStatus = match("a", status = MatchStatus.LIVE).copy(score = null, statusText = "1e set")
+        assertEquals("1e set", matchMidText(withStatus, isLive = true))
+        val blank = match("b", status = MatchStatus.LIVE).copy(score = null, statusText = "")
+        assertEquals("live", matchMidText(blank, isLive = true))
     }
 
     @Test
-    fun upcomingRowLabelLeadsWithKickoffTime() {
-        val m = match("a", status = MatchStatus.UPCOMING).copy(
-            home = "Gent", away = "STVV", score = null, statusText = "20:45",
-        )
-        assertEquals("20:45  Gent - STVV", matchRowLabel(m, isLive = false))
+    fun midTextForUpcomingIsKickoffTime() {
+        val m = match("a", status = MatchStatus.UPCOMING).copy(score = null, statusText = "20:45")
+        assertEquals("20:45", matchMidText(m, isLive = false))
+        val blank = match("b", status = MatchStatus.UPCOMING).copy(score = null, statusText = "")
+        assertEquals("gepland", matchMidText(blank, isLive = false))
+    }
+
+    @Test
+    fun sportEmojiCoversKnownSportsAndFallsBack() {
+        assertEquals("⚽", sportEmoji("voetbal"))
+        assertEquals("🎾", sportEmoji("tennis"))
+        assertEquals("🚴", sportEmoji("wielrennen"))
+        assertEquals("🏅", sportEmoji("onbekende-sport"))
+    }
+
+    @Test
+    fun motorsportSplitsFormulaFromRally() {
+        assertEquals("🏎", sportEmoji("formule-1"))
+        assertEquals("🚗", sportEmoji("rally"))
+        assertEquals("🚗", sportEmoji("rallycross"))
     }
 }
