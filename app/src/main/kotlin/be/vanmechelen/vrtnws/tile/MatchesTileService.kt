@@ -212,30 +212,40 @@ class MatchesTileService : TileService() {
             .build()
 
     /**
-     * The hero score. [sub] (the current-set games in tennis) rides low next to the main score
-     * like a subscript — the enclosing Row is bottom-aligned so the smaller text sits on the
-     * main score's baseline.
+     * The hero score. For tennis the current-set games ride as a subscript on each side's set
+     * count — "2₄-1₄" (sets 2-1, games 4-4) — by splitting [main] ("2 - 1") and [sub] ("4-4") into
+     * their two sides. Football (no [sub]) is just the plain score. The enclosing Row is
+     * bottom-aligned so the smaller games sit on the set count's baseline.
      */
     private fun scoreCell(main: String, sub: String?, color: Int): LayoutElementBuilders.LayoutElement {
-        val mainText = Text.Builder(this, main)
+        val sets = main.split(" - ")
+        val games = sub?.split("-")
+        if (sub != null && sets.size == 2 && games != null && games.size == 2) {
+            return LayoutElementBuilders.Row.Builder()
+                .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_BOTTOM)
+                .addContent(setCount(sets[0], color))
+                .addContent(gameSub(games[0]))
+                .addContent(setCount("-", color))
+                .addContent(setCount(sets[1], color))
+                .addContent(gameSub(games[1]))
+                .build()
+        }
+        return setCount(main, color)
+    }
+
+    private fun setCount(text: String, color: Int): LayoutElementBuilders.LayoutElement =
+        Text.Builder(this, text)
             .setTypography(Typography.TYPOGRAPHY_TITLE3)
             .setColor(argb(color))
             .setMaxLines(1)
             .build()
-        if (sub.isNullOrBlank()) return mainText
-        return LayoutElementBuilders.Row.Builder()
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_BOTTOM)
-            .addContent(mainText)
-            .addContent(spacer(2f))
-            .addContent(
-                Text.Builder(this, sub)
-                    .setTypography(Typography.TYPOGRAPHY_CAPTION2)
-                    .setColor(argb(DIM))
-                    .setMaxLines(1)
-                    .build(),
-            )
+
+    private fun gameSub(text: String): LayoutElementBuilders.LayoutElement =
+        Text.Builder(this, text)
+            .setTypography(Typography.TYPOGRAPHY_CAPTION2)
+            .setColor(argb(DIM))
+            .setMaxLines(1)
             .build()
-    }
 
     private fun spacer(width: Float): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Spacer.Builder().setWidth(dp(width)).build()
