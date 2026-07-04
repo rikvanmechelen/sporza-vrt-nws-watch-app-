@@ -8,13 +8,15 @@ Feed source: `https://www.vrt.be/vrtnws/nl.rss.articles.xml` (an **Atom** feed).
 
 ## Features
 
-- **Three sources in a horizontal pager** — swipe left/right between **Nieuws** (VRT NWS latest),
-  **Kort** (VRT NWS top headlines) and **Sport** (Sporza). Each is its own headline list.
+- **Three sources in a horizontal pager**, with a dot indicator at the top — swipe
+  left/right between **Kort** (VRT NWS top headlines), **Sport** (Sporza) and **Nieuws**
+  (VRT NWS latest). Each is its own headline list.
 - Scrollable headline list with thumbnails and relative timestamps (rotary-crown + touch).
 - Native article reader — the article page is fetched and its body extracted/reformatted
   for the round screen; a **"Open op telefoon"** button hands off to the phone browser.
 - Offline caching (Room): headlines and previously read articles remain available offline.
-- Manual refresh; swipe-from-left returns from an article to the list.
+- **Tap the source title** to force-refresh that feed. Swipe from the left edge returns
+  from an article to the list.
 - **Tile** and **complication** showing the latest headline, tap to open the app.
 
 ## Architecture
@@ -68,9 +70,13 @@ export JAVA_HOME=/opt/android-studio/jbr
 export ANDROID_HOME=$HOME/Android/Sdk
 
 ./gradlew test                 # JVM unit tests (parser, extractor, repository, viewmodels)
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest   # Compose UI tests (on emulator)
 ./gradlew :app:assembleDebug   # build APK
 ./gradlew :app:installDebug    # install to a connected watch / emulator
 ```
+
+Development happens on the emulator; only the **release** build is pushed to the watch
+(debug scrolling is janky). See `CLAUDE.md` for the full workflow and gotchas.
 
 ### Deploy to the Pixel Watch 4
 
