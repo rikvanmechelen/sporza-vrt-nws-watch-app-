@@ -122,7 +122,7 @@ fun MatchesScreen(
                     key = {
                         when (it) {
                             is MatchesEntry.SportHeader -> "h-${it.slug}"
-                            is MatchesEntry.MatchCard -> it.match.id
+                            is MatchesEntry.MatchCard -> "m-${it.match.detailUrl}"
                         }
                     },
                 ) { entry ->

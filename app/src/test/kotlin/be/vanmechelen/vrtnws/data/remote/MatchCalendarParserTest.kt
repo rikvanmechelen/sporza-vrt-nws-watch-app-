@@ -78,4 +78,27 @@ class MatchCalendarParserTest {
             assertTrue("bad url ${it.detailUrl}", it.detailUrl.startsWith("http"))
         }
     }
+
+    @Test
+    fun deduplicatesRepeatedMatchesByUrl() {
+        // Sporza lists some fixtures more than once (e.g. a featured match also shown under its
+        // competition). The same detailUrl must not appear twice — the matches list is keyed by
+        // it in a LazyColumn, and duplicate keys crash the screen while scrolling.
+        val html = """
+            <html><body>
+              <a href="https://sporza.be/nl/sport/voetbal/~3333005/">Club - Anderlecht</a>
+              <a href="https://sporza.be/nl/sport/voetbal/~3333005/">Club - Anderlecht</a>
+              <a href="https://sporza.be/nl/sport/tennis/~999/">Speler</a>
+            </body></html>
+        """.trimIndent()
+        val parsed = MatchCalendarParser.parse(html)
+        assertEquals(2, parsed.size)
+        assertEquals(parsed.map { it.detailUrl }.distinct(), parsed.map { it.detailUrl })
+    }
+
+    @Test
+    fun realFixtureHasNoDuplicateUrls() {
+        val urls = matches.map { it.detailUrl }
+        assertEquals(urls.distinct().size, urls.size)
+    }
 }

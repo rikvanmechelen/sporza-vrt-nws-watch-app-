@@ -75,8 +75,12 @@ object MatchCalendarParser {
             )
         }
 
-        // Group by sport (voetbal first, unknown sports last); stable within a sport = source order.
-        return matches.sortedBy { MatchSports.rank(it.sportSlug) }
+        // Sporza lists some fixtures more than once (e.g. a featured match also shown under its
+        // competition). Drop repeats (keep first) so downstream keys stay unique.
+        // Then group by sport (voetbal first, unknown last); stable within a sport = source order.
+        return matches
+            .distinctBy { it.detailUrl }
+            .sortedBy { MatchSports.rank(it.sportSlug) }
     }
 
     private data class Teams(
