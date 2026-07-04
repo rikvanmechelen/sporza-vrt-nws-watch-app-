@@ -47,7 +47,7 @@ object MatchCalendarParser {
                     .filter { it.any(Char::isDigit) }
                     .takeIf { it.size >= 2 }
                     ?.let { "${it.first()} - ${it.last()}" }
-            }
+            } ?: tennisSetScore(a)
             val label = scoreWrap?.selectFirst("[class*=label]")?.text()?.trim()
                 ?.takeIf { it.isNotBlank() }
             val live = a.className().contains("live") || scoreClass?.contains("live") == true
@@ -130,6 +130,22 @@ object MatchCalendarParser {
 
     private fun logoIn(el: Element): String? =
         el.selectFirst("img[src]")?.attr("src")?.trim()?.takeIf { it.isNotBlank() }?.let(::normalizeUrl)
+
+    /**
+     * Tennis scoreboards don't use the football `[class*=numbers]` structure; each played set is a
+     * `_set_` span holding two plain value spans (home games, away games) around a `set N` meta
+     * label. Join them into "6-4 3-6 5-1" (home-away per set). `_set_`/`_sets_` are the delimited
+     * CSS-module names — distinct from `setsPlayer`/`setsPlayers` which hold the player names.
+     */
+    private fun tennisSetScore(anchor: Element): String? =
+        anchor.select("[class*=_set_]").mapNotNull { setEl ->
+            setEl.select("span")
+                .filter { it.className().isBlank() }
+                .map { it.ownText().trim() }
+                .filter { it.isNotEmpty() && it.all(Char::isDigit) }
+                .takeIf { it.size >= 2 }
+                ?.let { "${it.first()}-${it.last()}" }
+        }.takeIf { it.isNotEmpty() }?.joinToString(" ")
 
     private fun statusOf(scoreClass: String?, hidden: String, live: Boolean): MatchStatus = when {
         live -> MatchStatus.LIVE

@@ -86,6 +86,19 @@ class MatchCalendarParserTest {
     }
 
     @Test
+    fun tennisLiveMatchesShowSetScore() {
+        val liveTennis = matches.filter { it.sportSlug == "tennis" && it.status == MatchStatus.LIVE }
+        assertTrue("expected some live tennis in the fixture", liveTennis.isNotEmpty())
+        val withScore = liveTennis.filter { it.score != null }
+        assertTrue("live tennis should expose a set score, not just 'live'", withScore.isNotEmpty())
+        // A set score is one or more "games-games" pairs (per set), e.g. "6-4 3-6 5-1".
+        val setScore = Regex("""\d+-\d+( \d+-\d+)*""")
+        withScore.forEach {
+            assertTrue("bad set score '${it.score}'", setScore.matches(it.score!!))
+        }
+    }
+
+    @Test
     fun everyMatchHasStableIdSportAndUrl() {
         matches.forEach {
             assertTrue("blank id", it.id.isNotBlank())
