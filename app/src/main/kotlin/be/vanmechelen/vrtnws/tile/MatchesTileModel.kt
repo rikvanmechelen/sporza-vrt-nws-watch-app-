@@ -22,7 +22,11 @@ data class MatchesTileModel(
  * order and simply filter.
  */
 fun matchesTileModel(matches: List<Match>, maxRows: Int = 3): MatchesTileModel {
-    val live = matches.filter { it.status == MatchStatus.LIVE }
+    // Guard against the same match appearing twice (Sporza repeats featured fixtures). Dedup by
+    // id — the match's true identity — which also catches repeats whose URLs differ only in
+    // formatting (trailing slash, fragment), unlike the parser's URL-based dedup.
+    val unique = matches.distinctBy { it.id }
+    val live = unique.filter { it.status == MatchStatus.LIVE }
     if (live.isNotEmpty()) {
         return MatchesTileModel(
             rows = live.take(maxRows),
@@ -30,7 +34,7 @@ fun matchesTileModel(matches: List<Match>, maxRows: Int = 3): MatchesTileModel {
             isLive = true,
         )
     }
-    val next = matches.firstOrNull { it.status == MatchStatus.UPCOMING }
+    val next = unique.firstOrNull { it.status == MatchStatus.UPCOMING }
     return MatchesTileModel(
         rows = listOfNotNull(next),
         moreLiveCount = 0,

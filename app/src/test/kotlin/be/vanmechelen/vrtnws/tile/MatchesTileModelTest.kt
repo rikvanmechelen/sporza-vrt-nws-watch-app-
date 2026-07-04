@@ -89,6 +89,31 @@ class MatchesTileModelTest {
     }
 
     @Test
+    fun dropsDuplicateLiveMatchesByIdAcrossUrlVariants() {
+        val a = match("dup", status = MatchStatus.LIVE)
+        // Same match repeated with a slightly different URL (parser's url-dedup would miss this).
+        val b = a.copy(detailUrl = a.detailUrl + "#featured")
+        val model = matchesTileModel(listOf(a, b, match("other", status = MatchStatus.LIVE)))
+        assertEquals(listOf("dup", "other"), model.rows.map { it.id })
+        assertEquals(0, model.moreLiveCount)
+    }
+
+    @Test
+    fun duplicatesDoNotInflateMoreCount() {
+        // 3 shown + what looks like 2 more, but both extras are dupes of shown matches → no "+N".
+        val live = listOf(
+            match("a", status = MatchStatus.LIVE),
+            match("b", status = MatchStatus.LIVE),
+            match("c", status = MatchStatus.LIVE),
+            match("a", status = MatchStatus.LIVE),
+            match("b", status = MatchStatus.LIVE),
+        )
+        val model = matchesTileModel(live)
+        assertEquals(listOf("a", "b", "c"), model.rows.map { it.id })
+        assertEquals(0, model.moreLiveCount)
+    }
+
+    @Test
     fun liveRowLabelLeadsWithScore() {
         val m = match("a", status = MatchStatus.LIVE).copy(
             home = "Club Brugge", away = "Anderlecht", score = "2 - 1", statusText = "45'",
