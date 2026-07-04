@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VRT NWS</string>
+    <string name="headlines_title">VRT NWS</string>
+    <string name="refresh">Vernieuwen</string>
+    <string name="loading">Laden…</string>
+    <string name="empty_headlines">Geen nieuws. Trek naar beneden om te vernieuwen.</string>
+    <string name="offline">Offline — laatst bewaarde nieuws</string>
+    <string name="load_error">Kon nieuws niet laden</string>
+    <string name="article_load_error">Kon artikel niet laden</string>
+    <string name="open_on_phone">Open op telefoon</string>
+    <string name="tile_latest">Laatste nieuws</string>
+</resources>
