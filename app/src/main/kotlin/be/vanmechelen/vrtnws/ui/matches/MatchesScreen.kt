@@ -225,9 +225,11 @@ private fun ScoreOrStatus(match: Match) {
             style = MaterialTheme.typography.title3,
             color = if (live) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface,
         )
-        if (match.score != null && match.statusText.isNotBlank()) {
+        // Under the headline score: the current-set games in tennis, else the status/minute.
+        val caption = match.subScore ?: match.statusText.takeIf { it.isNotBlank() }
+        if (match.score != null && caption != null) {
             Text(
-                text = match.statusText,
+                text = caption,
                 style = MaterialTheme.typography.caption3,
                 color = MaterialTheme.colors.onSurfaceVariant,
             )

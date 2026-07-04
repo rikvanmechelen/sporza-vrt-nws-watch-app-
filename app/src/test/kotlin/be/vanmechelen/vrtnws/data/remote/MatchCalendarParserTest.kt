@@ -86,16 +86,22 @@ class MatchCalendarParserTest {
     }
 
     @Test
-    fun tennisLiveMatchesShowSetScore() {
+    fun tennisLiveMatchesShowSetsWonWithCurrentGames() {
         val liveTennis = matches.filter { it.sportSlug == "tennis" && it.status == MatchStatus.LIVE }
         assertTrue("expected some live tennis in the fixture", liveTennis.isNotEmpty())
         val withScore = liveTennis.filter { it.score != null }
-        assertTrue("live tennis should expose a set score, not just 'live'", withScore.isNotEmpty())
-        // A set score is one or more "games-games" pairs (per set), e.g. "6-4 3-6 5-1".
-        val setScore = Regex("""\d+-\d+( \d+-\d+)*""")
+        assertTrue("live tennis should expose a score, not just 'live'", withScore.isNotEmpty())
+        // Headline score = sets won ("1 - 2"); subScore = current-set games ("4-3").
+        val setsWon = Regex("""\d+ - \d+""")
+        val games = Regex("""\d+-\d+""")
         withScore.forEach {
-            assertTrue("bad set score '${it.score}'", setScore.matches(it.score!!))
+            assertTrue("sets '${it.score}'", setsWon.matches(it.score!!))
+            it.subScore?.let { s -> assertTrue("games '$s'", games.matches(s)) }
         }
+        assertTrue(
+            "a live match should have a set in progress (subScore)",
+            withScore.any { it.subScore != null },
+        )
     }
 
     @Test

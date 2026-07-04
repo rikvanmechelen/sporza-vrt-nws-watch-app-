@@ -181,7 +181,7 @@ class MatchesTileService : TileService() {
         )
         row.addContent(spacer(5f))
 
-        val score = scoreText(matchMidText(match, isLive), if (isLive) YELLOW else WHITE)
+        val score = scoreCell(matchMidText(match, isLive), match.subScore, if (isLive) YELLOW else WHITE)
         if (match.home != null || match.away != null) {
             row.addContent(nameCell(match.home.orEmpty(), LayoutElementBuilders.HORIZONTAL_ALIGN_END))
             row.addContent(spacer(6f))
@@ -211,12 +211,31 @@ class MatchesTileService : TileService() {
             )
             .build()
 
-    private fun scoreText(text: String, color: Int): LayoutElementBuilders.LayoutElement =
-        Text.Builder(this, text)
+    /**
+     * The hero score. [sub] (the current-set games in tennis) rides low next to the main score
+     * like a subscript — the enclosing Row is bottom-aligned so the smaller text sits on the
+     * main score's baseline.
+     */
+    private fun scoreCell(main: String, sub: String?, color: Int): LayoutElementBuilders.LayoutElement {
+        val mainText = Text.Builder(this, main)
             .setTypography(Typography.TYPOGRAPHY_TITLE3)
             .setColor(argb(color))
             .setMaxLines(1)
             .build()
+        if (sub.isNullOrBlank()) return mainText
+        return LayoutElementBuilders.Row.Builder()
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_BOTTOM)
+            .addContent(mainText)
+            .addContent(spacer(2f))
+            .addContent(
+                Text.Builder(this, sub)
+                    .setTypography(Typography.TYPOGRAPHY_CAPTION2)
+                    .setColor(argb(DIM))
+                    .setMaxLines(1)
+                    .build(),
+            )
+            .build()
+    }
 
     private fun spacer(width: Float): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Spacer.Builder().setWidth(dp(width)).build()

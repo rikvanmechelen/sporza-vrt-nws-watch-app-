@@ -18,7 +18,10 @@ data class Match(
     val away: String?,
     val homeLogoUrl: String?,
     val awayLogoUrl: String?,
-    /** Goal/points score when the scoreboard exposes it, e.g. "3 - 2"; null otherwise. */
+    /**
+     * The headline score when the scoreboard exposes it: goals/points ("3 - 2") for football,
+     * or sets won ("1 - 2") for tennis. Null otherwise.
+     */
     val score: String?,
     /** Short status/label: kickoff time ("19:00"), live minute ("45'"), or "einde (n.v.)". */
     val statusText: String,
@@ -26,6 +29,8 @@ data class Match(
     val detailUrl: String,
     /** Always-present display title: "Home - Away", or a race/event descriptor. */
     val title: String,
+    /** Secondary score shown small next to [score]: the current-set games in tennis ("4-3"). */
+    val subScore: String? = null,
 )
 
 /** Ordering + display labels for the per-sport sections. Voetbal first, unknowns last. */

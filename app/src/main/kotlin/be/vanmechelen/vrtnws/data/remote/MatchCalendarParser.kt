@@ -42,12 +42,14 @@ object MatchCalendarParser {
             val scoreClass = scoreWrap?.className()
             // The score renders as adjacent inline spans (home, dash, away) with no whitespace,
             // so join the numeric spans ourselves to get "3 - 2" rather than "3-2".
-            val score = scoreWrap?.selectFirst("[class*=numbers]")?.let { nums ->
+            val footballScore = scoreWrap?.selectFirst("[class*=numbers]")?.let { nums ->
                 nums.select("span").map { it.text().trim() }
                     .filter { it.any(Char::isDigit) }
                     .takeIf { it.size >= 2 }
                     ?.let { "${it.first()} - ${it.last()}" }
-            } ?: tennisSetScore(a)
+            }
+            val tennis = if (footballScore == null) tennisScore(a) else null
+            val score = footballScore ?: tennis?.sets
             val label = scoreWrap?.selectFirst("[class*=label]")?.text()?.trim()
                 ?.takeIf { it.isNotBlank() }
             val live = a.className().contains("live") || scoreClass?.contains("live") == true
@@ -72,6 +74,7 @@ object MatchCalendarParser {
                 status = status,
                 detailUrl = href,
                 title = title,
+                subScore = tennis?.currentGames,
             )
         }
 
@@ -131,21 +134,47 @@ object MatchCalendarParser {
     private fun logoIn(el: Element): String? =
         el.selectFirst("img[src]")?.attr("src")?.trim()?.takeIf { it.isNotBlank() }?.let(::normalizeUrl)
 
+    private data class TennisScore(val sets: String, val currentGames: String?)
+
     /**
      * Tennis scoreboards don't use the football `[class*=numbers]` structure; each played set is a
      * `_set_` span holding two plain value spans (home games, away games) around a `set N` meta
-     * label. Join them into "6-4 3-6 5-1" (home-away per set). `_set_`/`_sets_` are the delimited
-     * CSS-module names — distinct from `setsPlayer`/`setsPlayers` which hold the player names.
+     * label (`_set_`/`_sets_` are the delimited CSS-module names, distinct from the `setsPlayer`
+     * ones that hold names). We summarise as sets won ("1 - 2") plus, for the set still in play,
+     * its current games ("4-3").
      */
-    private fun tennisSetScore(anchor: Element): String? =
-        anchor.select("[class*=_set_]").mapNotNull { setEl ->
+    private fun tennisScore(anchor: Element): TennisScore? {
+        val perSet = anchor.select("[class*=_set_]").mapNotNull { setEl ->
             setEl.select("span")
                 .filter { it.className().isBlank() }
                 .map { it.ownText().trim() }
                 .filter { it.isNotEmpty() && it.all(Char::isDigit) }
                 .takeIf { it.size >= 2 }
-                ?.let { "${it.first()}-${it.last()}" }
-        }.takeIf { it.isNotEmpty() }?.joinToString(" ")
+                ?.let { it.first().toInt() to it.last().toInt() }
+        }
+        if (perSet.isEmpty()) return null
+
+        var home = 0
+        var away = 0
+        var current: String? = null
+        perSet.forEachIndexed { i, (h, a) ->
+            when (setWinner(h, a)) {
+                1 -> home++
+                2 -> away++
+                else -> if (i == perSet.lastIndex) current = "$h-$a" // the set still in play
+            }
+        }
+        return TennisScore("$home - $away", current)
+    }
+
+    /** Winner of a completed tennis set: 1 = home, 2 = away, 0 = still in progress. */
+    private fun setWinner(h: Int, a: Int): Int = when {
+        h >= 6 && h - a >= 2 -> 1
+        a >= 6 && a - h >= 2 -> 2
+        h == 7 && a >= 5 -> 1 // 7-5, 7-6 (tiebreak)
+        a == 7 && h >= 5 -> 2
+        else -> 0
+    }
 
     private fun statusOf(scoreClass: String?, hidden: String, live: Boolean): MatchStatus = when {
         live -> MatchStatus.LIVE
