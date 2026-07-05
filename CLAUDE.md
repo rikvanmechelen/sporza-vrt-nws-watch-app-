@@ -65,7 +65,8 @@ adb -s emulator-5554 exec-out screencap -p > shot.png   # 480x480 round frame
 ```
 data/
   remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services,
-          MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores)
+          MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores),
+          ScheduleParser (regex over the schedule API JSON: real kickoff per fixture)
   local/  Room: ArticleEntity (PK id+source) + ArticleBodyEntity (PK url) + BlockConverters,
           ArticleDao, NewsDatabase (v2), RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
@@ -76,7 +77,7 @@ ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToD
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
           article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
 tile/     LatestHeadlineTileService + MatchesTileService (glances); MatchesTileModel (pure:
-          live-first selector + dedup, sportEmoji, matchMidText)
+          live-first selector + dedup, sportEmoji, matchMidText, localizeKickoffTime)
 complication/             glanceable latest headline
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
@@ -90,8 +91,9 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 - **Cache-first (news)**: `refresh(source)` fetches the feed → Room; `headlines(source)` is a
   `Flow`; `body(url)` is cache-first, keyed by url.
 - **Matches** (`MatchesRepository`, in-memory — scores are ephemeral): `refresh()` scrapes the
-  Sporza kalender via `MatchCalendarParser`; `detail(url)` is cache-first via
-  `MatchDetailExtractor`. No Room. Tap-to-refresh, no auto-polling.
+  Sporza kalender via `MatchCalendarParser`, then (only if promoted carousel cards are present)
+  patches their real kickoff in from the schedule API via `ScheduleParser`/`applyScheduleKickoffs`;
+  `detail(url)` is cache-first via `MatchDetailExtractor`. No Room. Tap-to-refresh, no auto-polling.
 
 ## Gotchas (don't accidentally revert these)
 
@@ -115,10 +117,26 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   cycling = no teams. The calendar is also `distinctBy { detailUrl }` — Sporza repeats featured
   fixtures — and the tile additionally dedups by `id` (catches url-variant repeats).
   Detail regions: field-timeline `[class*=hoverLabel]` (events), `.sw-timeline-item` (stream),
-  article prose minus live widgets (recap). A live-scoreboard JSON API exists
+  article prose minus live widgets (recap). A per-match live-scoreboard JSON API exists
   (`api.sporza.be/web/content/{sport}/matches/{id}`, poll `interval`) but is unused.
   The detail score header comes from the list `Match` snapshot; only events/stream/recap
   re-fetch on open (a live score can lag until the list is refreshed).
+- **Kickoff time comes from two places — only one is a real kickoff.** Scoreboard entries carry
+  the kickoff in their a11y hidden text (`"X tegen Y, vandaag om 22:00"`). But promoted
+  **livestream-card** carousel fixtures (`Match.id` prefixed `livestream-`, no scoreboard) carry
+  only a TV **broadcast window** (`"time":{"text":"20:30 - 23:20"}`) — the pre-show start, ~10–30
+  min before kickoff, and the lead varies per match so it can't be derived. `OkHttpMatchesService`
+  therefore enriches card matches from the **schedule API** `api.sporza.be/web/content/schedule?date=YYYY-MM-DD`
+  (the endpoint the calendar's own date-nav uses; fetched today..+2 days), whose `ariaLabel`
+  states the real kickoff. `ScheduleParser` regex-parses it (no JSON lib) → `applyScheduleKickoffs`
+  matches by team pair and overwrites only `livestream-`/`UPCOMING` cards' `statusText`.
+- **Match times are Europe/Brussels wall-clock; display converts to the watch's zone.** Sporza
+  (Belgian) renders every kickoff in CET/CEST as a bare `HH:mm` string, stored verbatim in
+  `Match.statusText`. Conversion happens at the **display boundary** (parsing stays "what Sporza
+  said" so the fixture-based parser tests are zone-independent): `localizeKickoffTime()` in
+  `MatchesTileModel.kt` rewrites any `HH:mm` token from `Europe/Brussels` into
+  `ZoneId.systemDefault()`, and is called at both render sites — `MatchesScreen.ScoreOrStatus`
+  and (wrapping `matchMidText`) `MatchesTileService`. `matchMidText` itself stays pure.
 - Round screen: list/reader content needs horizontal `contentPadding` or text clips on the curve.
 - Wear `HorizontalPageIndicator` forces itself to the bottom; the top dots are a custom Row.
 - **Tiles don't scroll** — ProtoLayout has no `LazyColumn`. `MatchesTileService` shows a fixed

@@ -6,6 +6,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 private fun match(
     id: String,
@@ -133,6 +135,77 @@ class MatchesTileModelTest {
         assertEquals("20:45", matchMidText(m, isLive = false))
         val blank = match("b", status = MatchStatus.UPCOMING).copy(score = null, statusText = "")
         assertEquals("gepland", matchMidText(blank, isLive = false))
+    }
+
+    // --- localizeKickoffTime: convert Sporza's Brussels wall-clock to the watch's zone ---
+
+    private val brussels = ZoneId.of("Europe/Brussels")
+    private val newYork = ZoneId.of("America/New_York")
+    private val jul4 = LocalDate.of(2026, 7, 4)
+
+    @Test
+    fun kickoffConvertsBrusselsToWesternZone() {
+        // The reported bug: 22:00 CEST (UTC+2) is 16:00 EDT (UTC-4).
+        assertEquals(
+            "16:00",
+            localizeKickoffTime("22:00", targetZone = newYork, sourceZone = brussels, today = jul4),
+        )
+    }
+
+    @Test
+    fun kickoffUnchangedWhenTargetIsSourceZone() {
+        assertEquals(
+            "22:00",
+            localizeKickoffTime("22:00", targetZone = brussels, sourceZone = brussels, today = jul4),
+        )
+    }
+
+    @Test
+    fun kickoffAppliesDstFromTheAnchorDate() {
+        // Winter: Brussels is CET (UTC+1), New York EST (UTC-5) → 6h offset, not 6h as in summer
+        // but with a different absolute result. 22:00 CET → 16:00 EST.
+        val jan4 = LocalDate.of(2026, 1, 4)
+        assertEquals(
+            "16:00",
+            localizeKickoffTime("22:00", targetZone = newYork, sourceZone = brussels, today = jan4),
+        )
+        // Same clock, summer: 22:00 CEST → 16:00 EDT. Both read 16:00, but the winter case only
+        // lands there because the date anchored CET/EST rather than CEST/EDT.
+        assertEquals(
+            "16:00",
+            localizeKickoffTime("22:00", targetZone = newYork, sourceZone = brussels, today = jul4),
+        )
+        // A time where the DST difference is visible: 13:30 CET → 07:30 EST, but 13:30 CEST →
+        // 07:30 EDT as well — pick one that crosses differently. 00:30 CEST → 18:30 (prev) EDT.
+        assertEquals(
+            "18:30",
+            localizeKickoffTime("00:30", targetZone = newYork, sourceZone = brussels, today = jul4),
+        )
+    }
+
+    @Test
+    fun kickoffLeavesNonTimeTextUntouched() {
+        for (s in listOf("live", "45'", "afgelopen", "gepland", "3 - 2", "1e set", "")) {
+            assertEquals(s, localizeKickoffTime(s, targetZone = newYork, sourceZone = brussels, today = jul4))
+        }
+    }
+
+    @Test
+    fun kickoffShowsTheInstantsClockAcrossADayBoundary() {
+        // 23:30 CEST (UTC+2) = 21:30 UTC = 06:30 next-day JST (UTC+9). We show the clock, 06:30.
+        assertEquals(
+            "06:30",
+            localizeKickoffTime("23:30", targetZone = ZoneId.of("Asia/Tokyo"), sourceZone = brussels, today = jul4),
+        )
+    }
+
+    @Test
+    fun kickoffZeroPadsTheResult() {
+        // 9:30 CEST → 03:30 EDT, padded to two digits.
+        assertEquals(
+            "03:30",
+            localizeKickoffTime("9:30", targetZone = newYork, sourceZone = brussels, today = jul4),
+        )
     }
 
     @Test

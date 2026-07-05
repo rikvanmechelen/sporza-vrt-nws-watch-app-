@@ -35,7 +35,8 @@ Single `:app` module, Kotlin + Jetpack Compose for Wear OS.
 ```
 data/
   remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services,
-          MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores)
+          MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores),
+          ScheduleParser (real kickoff times from the schedule API)
   local/  Room: ArticleEntity (id+source) + ArticleBodyEntity (url) + BlockConverters,
           ArticleDao, NewsDatabase, RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
@@ -46,7 +47,7 @@ ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToD
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
           article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
 tile/         LatestHeadlineTileService + MatchesTileService (ProtoLayout); MatchesTileModel
-              (pure: live-first selector + dedup, sportEmoji, matchMidText)
+              (pure: live-first selector + dedup, sportEmoji, matchMidText, localizeKickoffTime)
 complication/ LatestHeadlineComplicationService
 AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 ```
@@ -98,9 +99,15 @@ extractors, and cached in memory (`DefaultMatchesRepository`) since scores are e
   live widgets, reusing `ContentBlock`). Empty result → "Open op telefoon" fallback.
 - Sporza uses hashed CSS-module class names (`_scoreboard_mdatp_36`), so selectors match on
   `[class*=prefix]`, never exact names — the single place to adjust if Sporza changes markup.
-- Sporza also exposes a live-scoreboard JSON API
+- **Kickoff times** — scoreboard fixtures carry the kickoff in their text, but Sporza's promoted
+  "livestream-card" carousel matches carry only a TV *broadcast window* (which starts a variable
+  10–30 min before kickoff). For those, `ScheduleParser` reads the real kickoff from the schedule
+  API (`https://api.sporza.be/web/content/schedule?date=YYYY-MM-DD`) and patches it in. All times
+  are Sporza's Europe/Brussels wall-clock, and are **converted to the watch's own timezone** for
+  display (`localizeKickoffTime`), so a 22:00 Brussels kickoff reads 16:00 on a US-East watch.
+- Sporza also exposes a per-match live-scoreboard JSON API
   (`https://api.sporza.be/web/content/{sport}/matches/{id}`, with a poll `interval`) for
-  live matches; it is **not** used yet — the app is tap-to-refresh — but is the natural
+  live match scores; it is **not** used yet — the app is tap-to-refresh — but is the natural
   upgrade path for auto-polling.
 
 ## Build & deploy

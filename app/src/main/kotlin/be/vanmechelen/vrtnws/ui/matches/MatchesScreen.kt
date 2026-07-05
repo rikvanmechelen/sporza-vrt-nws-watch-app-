@@ -39,6 +39,7 @@ import be.vanmechelen.vrtnws.model.Match
 import be.vanmechelen.vrtnws.model.MatchSports
 import be.vanmechelen.vrtnws.model.MatchStatus
 import be.vanmechelen.vrtnws.tile.abbreviatePlayerName
+import be.vanmechelen.vrtnws.tile.localizeKickoffTime
 import be.vanmechelen.vrtnws.ui.components.EmptyState
 import be.vanmechelen.vrtnws.ui.components.ErrorState
 import be.vanmechelen.vrtnws.ui.components.ListCard
@@ -192,7 +193,7 @@ private fun ScoreOrStatus(match: Match, live: Boolean) {
                 )
             } else {
                 Text(
-                    text = match.score ?: match.statusText.ifBlank { "—" },
+                    text = match.score ?: localizeKickoffTime(match.statusText).ifBlank { "—" },
                     style = MaterialTheme.typography.title1.copy(
                         fontWeight = if (hasScore) FontWeight.ExtraBold else FontWeight.Bold,
                         fontFeatureSettings = "tnum",

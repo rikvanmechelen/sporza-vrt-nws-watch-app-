@@ -201,7 +201,7 @@ class MatchesTileService : TileService() {
         row.addContent(text(sportEmoji(match.sportSlug), SZ_EMOJI, NAME))
         row.addContent(spacer(7f))
 
-        val score = scoreCell(matchMidText(match, isLive), match.subScore, if (isLive) GREEN else DIM)
+        val score = scoreCell(localizeKickoffTime(matchMidText(match, isLive)), match.subScore, if (isLive) GREEN else DIM)
         if (match.home != null || match.away != null) {
             row.addContent(nameCell(displayName(match, match.home.orEmpty()), LayoutElementBuilders.HORIZONTAL_ALIGN_END))
             row.addContent(spacer(7f))

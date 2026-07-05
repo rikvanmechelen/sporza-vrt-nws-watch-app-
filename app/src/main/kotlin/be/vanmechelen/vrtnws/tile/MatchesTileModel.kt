@@ -2,6 +2,10 @@ package be.vanmechelen.vrtnws.tile
 
 import be.vanmechelen.vrtnws.model.Match
 import be.vanmechelen.vrtnws.model.MatchStatus
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 /**
  * What the sports Tile should show, distilled from the (already rank-sorted, voetbal-first)
@@ -49,6 +53,34 @@ fun matchesTileModel(matches: List<Match>, maxRows: Int = 3): MatchesTileModel {
  */
 fun matchMidText(match: Match, isLive: Boolean): String =
     match.score ?: match.statusText.ifBlank { if (isLive) "live" else "gepland" }
+
+private val SPORZA_ZONE = ZoneId.of("Europe/Brussels")
+private val timeToken = Regex("""\b(\d{1,2}):(\d{2})\b""")
+
+/**
+ * Rewrites any HH:mm kickoff clock in [text] from Sporza's Europe/Brussels wall time (the site
+ * is Belgian and server-renders every time in CET/CEST) into [targetZone] — the watch's zone
+ * ([ZoneId.systemDefault]) at runtime. [today] anchors the date so DST is applied correctly; the
+ * date is never displayed, so a near-term fixture being off by a calendar day doesn't matter —
+ * only the clock does. Non-time text ("live", "45'", "afgelopen", "gepland") and scores ("3 - 2")
+ * have no colon-time and pass through unchanged, so this is safe to apply to any [Match.statusText].
+ */
+fun localizeKickoffTime(
+    text: String,
+    targetZone: ZoneId = ZoneId.systemDefault(),
+    sourceZone: ZoneId = SPORZA_ZONE,
+    today: LocalDate = LocalDate.now(sourceZone),
+): String {
+    if (targetZone == sourceZone) return text
+    return timeToken.replace(text) { m ->
+        val h = m.groupValues[1].toInt()
+        val min = m.groupValues[2].toInt()
+        if (h > 23 || min > 59) return@replace m.value // not a clock time
+        val tgt = ZonedDateTime.of(today, LocalTime.of(h, min), sourceZone)
+            .withZoneSameInstant(targetZone)
+        "%02d:%02d".format(tgt.hour, tgt.minute)
+    }
+}
 
 /**
  * Shortens a tennis player name so long (especially doubles) names fit a scoreboard row without
