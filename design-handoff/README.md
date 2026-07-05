@@ -6,6 +6,8 @@ Everything needed to design a visual overhaul. Start with **`DESIGN_BRIEF.md`**.
 
 - **`DESIGN_BRIEF.md`** — the brief: what the app is, hard Wear OS / ProtoLayout
   constraints, the brand palette, the surfaces to redesign, and the deliverables.
+- **`TYPOGRAPHY.md`** — the authoritative type scale (from the current build). The mockups
+  should be updated to these exact sizes/weights; the implementation is the source of truth.
 - **`screenshots/`** — the current app on the watch (round 480×480), one per surface:
   - `01-news-kort.png` — headline list (Kort)
   - `02-news-sport.png` — headline list (Sport), refreshing
