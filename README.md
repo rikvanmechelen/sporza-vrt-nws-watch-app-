@@ -141,7 +141,10 @@ watch UI.
   `gradle.properties`).
 - Navigation uses a manual `SwipeToDismissBox` rather than `SwipeDismissableNavHost`
   (the latter would not render its start destination with this dependency set).
-- The Wear **emulator** has no usable internet unless paired with a phone companion and
-  its `screencap` renders black under SwiftShader — verify visuals on the real watch.
+- The Wear **emulator** has no usable internet unless paired with a phone companion.
+- **Screenshots** work on both emulator and watch: `adb -s <serial> exec-out screencap -p >
+  shot.png` (480×480). Launch a screen first with `am start … --es tab matches` (cold start
+  only), and drive navigation with `adb shell input swipe/tap`. Tiles/complication are
+  system-hosted glances and can't be screenshotted — check those on the watch. See `CLAUDE.md`.
 - Unofficial personal use of a public feed; no VRT branding assets are bundled.
 ```

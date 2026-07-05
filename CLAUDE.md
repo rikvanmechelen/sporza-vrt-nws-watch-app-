@@ -42,8 +42,23 @@ export ANDROID_HOME=$HOME/Android/Sdk           # adb at $ANDROID_HOME/platform-
 - Watch: connects over **Wi-Fi wireless debugging** (no USB data). It auto-reconnects via
   mDNS (`adb mdns services`); if it dropped, wake it / re-check Wireless debugging. The
   stable serial is `adb-5A231WRBNL30KN-VRzvYX._adb-tls-connect._tcp`.
-- `adb screencap` is **black on the emulator** (SwiftShader) — verify via `uiautomator dump`
-  text, the Room DB, or the real watch. Screenshots on the real watch work.
+### Screenshots
+`adb exec-out screencap -p` works on **both** the emulator and the real watch (an older
+SwiftShader black-screen issue is gone). Capture a surface:
+
+```bash
+adb -s emulator-5554 exec-out screencap -p > shot.png   # 480x480 round frame
+```
+
+- Launch a specific screen first: `adb -s emulator-5554 shell am start \
+    -n be.vanmechelen.vrtnws/.ui.MainActivity --es tab matches` (extra opens the Matches
+  tab; omit for tab 0). Deep-link only applies on a **cold** start — `force-stop` first,
+  since `MainActivity` reads the extra in `onCreate` (no `onNewIntent`).
+- Navigate with `adb shell input swipe <x1> <y1> <x2> <y2> <ms>` (page swipes) and
+  `input tap <x> <y>` (open an item). Give screens a moment to render/settle before capturing.
+- **Tiles/complication can't be screenshotted** (system-hosted glances, not launchable via
+  `am`) — verify those on the real watch.
+- `adb -s <serial> ...` also works against the watch serial for on-wrist screenshots.
 
 ## Architecture
 
