@@ -176,7 +176,14 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 - **Matches tile refreshes over the network on each tile request** — unlike the headline tile,
   which reads Room instantly, `matchesRepository` is in-memory and starts empty, so the tile
   calls `refresh()` then reads `matches().first()`. Requests a 1-min freshness interval (Wear
-  throttles it), so it's "current score", not live-ticking.
+  throttles it), so it's "current score", not live-ticking. There's also a manual **refresh
+  button** (teal `ic_refresh` in a card-tinted pill): a nested `Clickable` whose `LoadAction`
+  re-triggers `onTileRequest` (→ `refresh()`) in place — so a tap here refetches scores without
+  opening the app, while a tap anywhere else still deep-links to the Matches tab. Nested clickables:
+  the inner refresh wins in its own bounds. It sits inline in `liveHeader()` (next to "● Live nu")
+  when live; the upcoming/empty fallbacks have no header, so they keep the button at the bottom. The
+  icon is mapped in `onTileResourcesRequest` (`RES_REFRESH`); bump `RES_VERSION` when tile resources
+  change.
 - **Tile → tab deep-link**: `MatchesTileService`'s `LaunchAction` sets the `tab=matches` extra
   (`MainActivity.EXTRA_TAB`); `MainActivity` maps it to `MATCHES_TAB_INDEX` (defined in
   `NavGraph.kt` as the pager's last page) → `AppRoot(initialTab=…)`. No extra ⇒ tab 0, so the

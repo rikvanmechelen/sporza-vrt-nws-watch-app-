@@ -28,7 +28,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import java.util.concurrent.TimeUnit
 
-private const val RES_VERSION = "1"
+private const val RES_VERSION = "2"
+private const val RES_REFRESH = "ic_refresh"
 
 // Redesign palette (mirrors the app's section colours; ProtoLayout uses the system font).
 private const val NAME = 0xFFE6E7EA.toInt() // team / player names
@@ -77,7 +78,19 @@ class MatchesTileService : TileService() {
     override fun onTileResourcesRequest(
         requestParams: RequestBuilders.ResourcesRequest,
     ): ListenableFuture<ResourceBuilders.Resources> = scope.future {
-        ResourceBuilders.Resources.Builder().setVersion(RES_VERSION).build()
+        ResourceBuilders.Resources.Builder()
+            .setVersion(RES_VERSION)
+            .addIdToImageMapping(
+                RES_REFRESH,
+                ResourceBuilders.ImageResource.Builder()
+                    .setAndroidResourceByResId(
+                        ResourceBuilders.AndroidImageResourceByResId.Builder()
+                            .setResourceId(R.drawable.ic_refresh)
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build()
     }
 
     private fun buildTile(model: MatchesTileModel): TileBuilders.Tile {
@@ -122,6 +135,46 @@ class MatchesTileService : TileService() {
             .build()
     }
 
+    /**
+     * A small refresh affordance. Tapping it fires a [LoadAction][ActionBuilders.LoadAction],
+     * which re-triggers [onTileRequest] — and that already calls `repo.refresh()` before reading
+     * the calendar, so the latest scores are refetched in place without leaving the tile. It's a
+     * nested clickable inside the whole-tile "open app" box, so a tap here wins in its own bounds.
+     */
+    private fun refreshButton(box: Float = 32f, icon: Float = 16f): LayoutElementBuilders.LayoutElement {
+        val clickable = ModifiersBuilders.Clickable.Builder()
+            .setId("refresh_matches")
+            .setOnClick(ActionBuilders.LoadAction.Builder().build())
+            .build()
+        return LayoutElementBuilders.Box.Builder()
+            .setWidth(dp(box))
+            .setHeight(dp(box))
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setClickable(clickable)
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(argb(CARD))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(box / 2f)).build())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .addContent(
+                LayoutElementBuilders.Image.Builder()
+                    .setResourceId(RES_REFRESH)
+                    .setWidth(dp(icon))
+                    .setHeight(dp(icon))
+                    .setColorFilter(
+                        LayoutElementBuilders.ColorFilter.Builder().setTint(argb(TEAL)).build(),
+                    )
+                    .build(),
+            )
+            .build()
+    }
+
     private fun emptyLayout(): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
@@ -129,7 +182,14 @@ class MatchesTileService : TileService() {
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(openMatchesModifiers())
-            .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
+            .addContent(
+                LayoutElementBuilders.Column.Builder()
+                    .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+                    .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
+                    .addContent(vSpacer(12f))
+                    .addContent(refreshButton())
+                    .build(),
+            )
             .build()
 
     private fun contentLayout(model: MatchesTileModel): LayoutElementBuilders.LayoutElement {
@@ -154,6 +214,13 @@ class MatchesTileService : TileService() {
             )
         }
 
+        // When live, refresh lives in the header next to "Live nu"; the upcoming fallback has no
+        // header, so it keeps a refresh button at the bottom.
+        if (!model.isLive) {
+            column.addContent(vSpacer(12f))
+            column.addContent(refreshButton())
+        }
+
         return LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
@@ -164,13 +231,15 @@ class MatchesTileService : TileService() {
             .build()
     }
 
-    /** "● Live nu" — a coral dot next to a teal, glanceable header. */
+    /** "● Live nu ⟳" — a coral dot next to a teal, glanceable header, with refresh alongside. */
     private fun liveHeader(): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Row.Builder()
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .addContent(dot(CORAL, 6f))
             .addContent(spacer(6f))
             .addContent(text(getString(R.string.tile_live_now), SZ_HEADER, TEAL, FONT_WEIGHT_BOLD))
+            .addContent(spacer(8f))
+            .addContent(refreshButton(box = 26f, icon = 14f))
             .build()
 
     /**

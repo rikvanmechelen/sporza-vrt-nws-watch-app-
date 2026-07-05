@@ -29,6 +29,8 @@ Live scores come from the Sporza calendar (`https://sporza.be/nl/kalender`, scra
   3 live matches (football first): a sport emoji, home/away, and the score as the accented hero;
   it shows a "+N meer" overflow and falls back to the next upcoming match when nothing is live.
   Tapping a tile opens the app; the live-scores tile deep-links straight to the Matches page.
+  The live-scores tile also has a small **refresh button** that refetches the latest scores in
+  place (without opening the app).
 
 ## Architecture
 
