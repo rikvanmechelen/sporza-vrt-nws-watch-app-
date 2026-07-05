@@ -117,7 +117,8 @@ fun AppRoot(
                     )
                     ArticleScreen(
                         viewModel = articleViewModel,
-                        title = current.title,
+                        article = current,
+                        section = selectedSection,
                         onOpenOnPhone = { openOnPhone(context, it) },
                     )
                 }

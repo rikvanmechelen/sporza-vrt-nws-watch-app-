@@ -13,8 +13,10 @@ Live scores come from the Sporza calendar (`https://sporza.be/nl/kalender`, scra
   between **Kort** (VRT NWS top headlines), **Sport** (Sporza), **Nieuws** (VRT NWS latest,
   browsable by category) and **Matches** (live Sporza scores). Each is its own screen.
 - Scrollable headline list with thumbnails and relative timestamps (rotary-crown + touch).
-- Native article reader — the article page is fetched and its body extracted/reformatted
-  for the round screen; a **"Open op telefoon"** button hands off to the phone browser.
+- Native article reader — lead-image-first: the article's photo bleeds to the top arc under a
+  scrim with the kicker + title over it (a section-tinted stripe placeholder stands in when there's
+  no photo), then a source-mark meta line and the body extracted/reformatted for the round screen;
+  a **"Open op telefoon"** button hands off to the phone browser.
 - **Matches**: live match results grouped by sport (voetbal first) with scores and status.
   Tap a match for its detail — quick events (goals / subs / cards), the **"Fase per fase"**
   live update stream, and the match recap.
@@ -45,7 +47,8 @@ model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsS
           Match / MatchDetail (MatchEvent, StreamItem) + MatchSports
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
-          article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
+          article/ (lead-image-first Screen + ViewModel + ArticleReaderModel helpers),
+          matches/ (Screen + ViewModel, Detail Screen + ViewModel)
 tile/         LatestHeadlineTileService + MatchesTileService (ProtoLayout); MatchesTileModel
               (pure: live-first selector + dedup, sportEmoji, matchMidText, localizeKickoffTime)
 complication/ LatestHeadlineComplicationService

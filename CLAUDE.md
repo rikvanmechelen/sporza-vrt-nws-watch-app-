@@ -75,7 +75,8 @@ model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsS
           Match / MatchDetail (MatchEvent, StreamItem) + MatchSports
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
-          article/ (Screen + ViewModel), matches/ (Screen + ViewModel, Detail Screen + ViewModel)
+          article/ (lead-image-first Screen + ViewModel + ArticleReaderModel pure helpers),
+          matches/ (Screen + ViewModel, Detail Screen + ViewModel)
 tile/     LatestHeadlineTileService + MatchesTileService (glances); MatchesTileModel (pure:
           live-first selector + dedup, sportEmoji, matchMidText, localizeKickoffTime)
 complication/             glanceable latest headline
@@ -102,6 +103,20 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 - **Rotary focus**: use `remember { FocusRequester() }` + `LaunchedEffect { requestFocus() }`,
   NOT `rememberActiveFocusRequester()` (crashes: "FocusRequester is not initialized" — no
   HierarchicalFocusCoordinator here). In the pager, gate focus to the active page.
+- **Article reader is lead-image-first, and NOT a `ScalingLazyColumn`** — it's a plain
+  `Column(verticalScroll)` + `rotaryScrollable`, with a `graphicsLayer(Offscreen)` +
+  `drawWithContent`/`BlendMode.DstIn` gradient that fades both scroll edges (the top fade ramps in
+  with scroll so the lead image sits flush to the arc at rest). SLC was rejected because it scales
+  the first item, which breaks a full-bleed hero. The lead is a fixed-height image (or
+  section-tinted diagonal `stripeBrush` fallback when `imageUrl` is null) pinned to the top under a
+  scrim; the kicker + title are anchored ~42% down the image and flow *downward* — a long title is
+  shown in full and continues past the image onto black, so it never grows up into the narrow top
+  arc and is never clipped (don't re-add a `maxLines` cap on the title). Body items carry their own
+  horizontal `BodyPadding` (the column itself has none, so the hero bleeds edge-to-edge). Source
+  mark/name + tidy one-tag kicker are pure, unit-tested helpers in `ArticleReaderModel.kt`
+  (`readerSourceFor(section)`, `kickerLabel(category)` — the feed's `nstag` can be pipe-joined).
+  `ArticleScreen` takes the `Article` + `Section` (not just the title) so the hero/meta render from
+  the list snapshot instantly, before the body finishes extracting.
 - **ArticleExtractor** is the single place to tune if a site changes. Layered:
   1) VRT `prose-article-*` DOM, 2) JSON-LD `articleBody`/`liveBlogUpdate` (Sporza matches),
   3) main-scoped `<p>`/`<h2>` (Sporza articles have no prose-article-* classes).
