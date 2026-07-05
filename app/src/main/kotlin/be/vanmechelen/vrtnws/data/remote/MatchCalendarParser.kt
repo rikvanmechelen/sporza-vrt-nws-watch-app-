@@ -80,10 +80,104 @@ object MatchCalendarParser {
 
         // Sporza lists some fixtures more than once (e.g. a featured match also shown under its
         // competition). Drop repeats (keep first) so downstream keys stay unique.
-        // Then group by sport (voetbal first, unknown last); stable within a sport = source order.
-        return matches
+        val scoreboard = matches.distinctBy { it.detailUrl }
+
+        // Marquee/live matches (e.g. World Cup knockouts) are sometimes dropped from the
+        // scoreboard list and surfaced ONLY as promoted "livestream-card" carousel items, so add
+        // those too — but skip any that duplicate a scoreboard we already have (that one has a
+        // real detail link, the card only points at /nl/livestream/).
+        val scoreboardKeys = scoreboard.map(::teamKey).toHashSet()
+        val cards = livestreamMatches(html)
             .distinctBy { it.detailUrl }
+            .filterNot { teamKey(it) in scoreboardKeys }
+
+        // Group by sport (voetbal first, unknown last); stable within a sport = source order.
+        return (scoreboard + cards)
             .sortedBy { MatchSports.rank(it.sportSlug) }
+    }
+
+    /** Identity for dedup: the team pair when known (order-insensitive), else the title. */
+    private fun teamKey(m: Match): String =
+        if (m.home != null && m.away != null) {
+            listOf(m.home, m.away).map { it.trim().lowercase() }.sorted().joinToString("|")
+        } else {
+            m.title.trim().lowercase()
+        }
+
+    private const val LIVESTREAM_MARKER = "\"componentType\":\"livestream-card\""
+    private val titleRegex = Regex(""""title":"([^"]*)"""")
+    private val subtitleRegex = Regex(""""subtitle":"([^"]*)"""")
+    private val statusRegex = Regex(""""status":"([A-Z_]+)"""")
+    private val timeTextRegex = Regex(""""time":\{"text":"([^"]*)"""")
+    private val linkRegex = Regex(""""link":"([^"]*)"""")
+
+    /**
+     * Parses the header carousel's `livestream-card` items out of the embedded Next.js JSON. These
+     * are flat objects — `{"title":"Paraguay - Frankrijk","subtitle":"voetbal | FIFA WK 2026 …",
+     * "button":{…,"status":"LIVE"},"progress":77,"link":"…/livestream/"}` — with no match id or
+     * scoreboard link, so we synthesise a stable id/url and carry no score (cards only show a
+     * progress bar). We read straight off the raw HTML string: the JSON isn't in the DOM tree.
+     */
+    private fun livestreamMatches(html: String): List<Match> {
+        val starts = generateSequence(html.indexOf(LIVESTREAM_MARKER)) { prev ->
+            html.indexOf(LIVESTREAM_MARKER, prev + 1).takeIf { it >= 0 }
+        }.takeWhile { it >= 0 }.toList()
+
+        return starts.mapNotNull { start ->
+            // Each card's JSON is short; a fixed window stays within it (fields are read
+            // first-match, and the current card's fields all precede the next card's marker).
+            val chunk = html.substring(start, minOf(start + 600, html.length))
+            parseLivestreamCard(chunk)
+        }
+    }
+
+    private fun parseLivestreamCard(chunk: String): Match? {
+        val title = titleRegex.find(chunk)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
+            ?: return null
+        // A real match card has a "sport | competition" subtitle; skip anything else in the rail.
+        val subtitle = subtitleRegex.find(chunk)?.groupValues?.get(1)?.trim().orEmpty()
+        if (!subtitle.contains("|")) return null
+        val sportSlug = subtitle.substringBefore("|").trim().lowercase().replace(' ', '-')
+        if (sportSlug.isBlank()) return null
+        val competition = subtitle.substringAfter("|").trim().takeIf { it.isNotBlank() }
+
+        val status = when (statusRegex.find(chunk)?.groupValues?.get(1)) {
+            "LIVE" -> MatchStatus.LIVE
+            "NOT_STARTED" -> MatchStatus.UPCOMING
+            "ENDED", "FINISHED" -> MatchStatus.FINISHED
+            else -> MatchStatus.UNKNOWN
+        }
+        val timeText = timeTextRegex.find(chunk)?.groupValues?.get(1).orEmpty()
+        val link = linkRegex.find(chunk)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+            ?: "https://sporza.be/nl/livestream/"
+
+        // "Home - Away" splits into teams; race/stage titles (no " - ") stay title-only.
+        val parts = title.split(" - ")
+        val home = parts.getOrNull(0)?.trim()?.takeIf { parts.size == 2 && it.isNotBlank() }
+        val away = parts.getOrNull(1)?.trim()?.takeIf { parts.size == 2 && it.isNotBlank() }
+
+        val slug = title.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+        return Match(
+            id = "livestream-$slug",
+            sportSlug = sportSlug,
+            competition = competition,
+            home = home,
+            away = away,
+            homeLogoUrl = null,
+            awayLogoUrl = null,
+            score = null, // cards show a progress bar, not a score
+            statusText = when (status) {
+                MatchStatus.LIVE -> "live"
+                MatchStatus.FINISHED -> "afgelopen"
+                else -> timeRegex.find(timeText)?.value ?: "gepland"
+            },
+            status = status,
+            // No scoreboard link exists; keep the livestream link but make it unique per card so
+            // list keys don't collide (all cards share the bare /nl/livestream/ url otherwise).
+            detailUrl = link.substringBefore("#") + "#" + slug,
+            title = title,
+            subScore = null,
+        )
     }
 
     private data class Teams(

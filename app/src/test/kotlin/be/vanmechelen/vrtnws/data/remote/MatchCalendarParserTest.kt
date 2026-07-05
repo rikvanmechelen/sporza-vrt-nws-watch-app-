@@ -135,4 +135,56 @@ class MatchCalendarParserTest {
         val urls = matches.map { it.detailUrl }
         assertEquals(urls.distinct().size, urls.size)
     }
+
+    // --- Livestream cards ------------------------------------------------------------------
+    // During the World Cup, Sporza drops the marquee live match from the scoreboard calendar
+    // list and surfaces it only as a promoted "livestream-card" in the header carousel (a JSON
+    // blob, link → /nl/livestream/, no /sport/.../~id scoreboard). This fixture is that state:
+    // Paraguay - Frankrijk is LIVE and exists ONLY as a livestream card.
+
+    private val liveCal: List<Match> by lazy {
+        MatchCalendarParser.parse(fixture("sporza_kalender_livestream.html"))
+    }
+
+    @Test
+    fun livestreamOnlyLiveMatchAppears() {
+        val france = liveCal.firstOrNull { it.home == "Paraguay" && it.away == "Frankrijk" }
+        assertNotNull("live Paraguay - Frankrijk should show even without a scoreboard", france)
+        assertEquals("voetbal", france!!.sportSlug)
+        assertEquals(MatchStatus.LIVE, france.status)
+        assertTrue("competition from subtitle", france.competition?.contains("WK 2026") == true)
+        assertTrue("detail url is set", france.detailUrl.startsWith("http"))
+    }
+
+    @Test
+    fun livestreamUpcomingMatchAppearsWithKickoffTime() {
+        // A WK match that is only a livestream card and not yet started still shows, as UPCOMING.
+        val portugal = liveCal.firstOrNull { it.home == "Portugal" && it.away == "Spanje" }
+        assertNotNull("upcoming livestream-only match should show", portugal)
+        assertEquals(MatchStatus.UPCOMING, portugal!!.status)
+        assertEquals("20:30", portugal.statusText)
+        assertEquals(null, portugal.score)
+    }
+
+    @Test
+    fun livestreamCardDeduplicatedAgainstScoreboard() {
+        // Brazilië - Noorwegen has BOTH a real scoreboard and a livestream card in this fixture.
+        // We must keep the scoreboard (real detail link) and drop the card, so it shows once.
+        val brazil = liveCal.filter { it.home == "Brazilië" }
+        assertEquals("Brazilië - Noorwegen must appear exactly once", 1, brazil.size)
+        assertTrue(
+            "the surviving entry is the real scoreboard, not the livestream card",
+            brazil.single().detailUrl.contains("/sport/voetbal/~"),
+        )
+    }
+
+    @Test
+    fun livestreamMatchesKeepUniqueKeysAndStayGrouped() {
+        val urls = liveCal.map { it.detailUrl }
+        assertEquals("no duplicate detail urls", urls.distinct().size, urls.size)
+        val ids = liveCal.map { it.id }
+        assertEquals("no duplicate ids", ids.distinct().size, ids.size)
+        val ranks = liveCal.map { MatchSports.rank(it.sportSlug) }
+        assertEquals("still grouped by sport", ranks.sorted(), ranks)
+    }
 }
