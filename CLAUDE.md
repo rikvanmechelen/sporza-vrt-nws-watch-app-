@@ -76,7 +76,8 @@ model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsS
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
           reader/detail), theme, headlines/ (Screen + ViewModel, per-source),
           article/ (lead-image-first Screen + ViewModel + ArticleReaderModel pure helpers),
-          matches/ (Screen + ViewModel, Detail Screen + ViewModel)
+          matches/ (Screen + ViewModel, lead-hero Detail Screen + ViewModel + MatchReaderModel
+          pure helper)
 tile/     LatestHeadlineTileService + MatchesTileService (glances); MatchesTileModel (pure:
           live-first selector + dedup, sportEmoji, matchMidText, localizeKickoffTime)
 complication/             glanceable latest headline
@@ -108,13 +109,12 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   `else` branch (list screens gate it behind loading/error/empty states), keying the effect on
   `isActive` alone loses the request that fires during loading — the crown then stays dead until
   the page is swiped away and back. Key the effect on `isActive` **and** a "content is showing"
-  flag mirroring the branch condition (Headlines/Categories/Matches do this). MatchDetail composes
-  the scrollable unconditionally (spinner *inside* it) so `LaunchedEffect(Unit)` is enough there.
-  **The Article reader is the subtle one:** its scrollable `Column` sits inside `BoxWithConstraints`
-  (a `SubcomposeLayout`), so the rotary focus node is composed in the *layout* pass, after the
-  first-frame `LaunchedEffect(Unit)` — a lone entry request is lost and the crown stays dead. It
-  keys the effect on the `ui` state instead, so the request re-fires when the body settles
-  (Loading→Ready), a recomposition that lands after layout when the node exists.
+  flag mirroring the branch condition (Headlines/Categories/Matches do this).
+  **The Article reader and MatchDetail are the subtle ones:** each scrollable `Column` sits inside
+  `BoxWithConstraints` (a `SubcomposeLayout`), so the rotary focus node is composed in the *layout*
+  pass, after the first-frame `LaunchedEffect(Unit)` — a lone entry request is lost and the crown
+  stays dead. Both key the effect on the `ui` state instead, so the request re-fires when the body
+  settles (Loading→Ready), a recomposition that lands after layout when the node exists.
 - **Article reader is lead-image-first, and NOT a `ScalingLazyColumn`** — it's a plain
   `Column(verticalScroll)` + `rotaryScrollable`, with a `graphicsLayer(Offscreen)` +
   `drawWithContent`/`BlendMode.DstIn` gradient that fades both scroll edges (the top fade ramps in
@@ -129,6 +129,16 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   (`readerSourceFor(section)`, `kickerLabel(category)` — the feed's `nstag` can be pipe-joined).
   `ArticleScreen` takes the `Article` + `Section` (not just the title) so the hero/meta render from
   the list snapshot instantly, before the body finishes extracting.
+- **MatchDetail gets the same lead-hero treatment as the article reader** (same
+  `Column(verticalScroll)` + `graphicsLayer(Offscreen)`/`BlendMode.DstIn` edge-fade, NOT a
+  `ScalingLazyColumn`). Matches never carry a photo, so the hero is *always* the "replacement
+  graphic": a section-tinted diagonal `stripeBrush` (green, since detail is themed `Section.SPORT`)
+  with the `sportEmoji(sportSlug)` as a faint large watermark, under a scrim. The scoreboard
+  (competition kicker + teams + big score + LIVE pill / kickoff) rides the hero's lower part and
+  flows *downward* like an article title, so long names / tennis set-scores continue onto black
+  rather than clipping into the top arc. Sections below (events → stream → recap) carry their own
+  horizontal `BodyPadding` (the column has none, so the hero bleeds edge-to-edge). The kicker is a
+  pure, unit-tested helper in `MatchReaderModel.kt` (`matchKicker` — competition, else sport label).
 - **ArticleExtractor** is the single place to tune if a site changes. Layered:
   1) VRT `prose-article-*` DOM, 2) JSON-LD `articleBody`/`liveBlogUpdate` (Sporza matches),
   3) main-scoped `<p>`/`<h2>` (Sporza articles have no prose-article-* classes).

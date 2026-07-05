@@ -3,31 +3,43 @@ package be.vanmechelen.vrtnws.ui.matches
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material.CircularProgressIndicator
@@ -42,14 +54,28 @@ import be.vanmechelen.vrtnws.model.MatchEvent
 import be.vanmechelen.vrtnws.model.MatchEventType
 import be.vanmechelen.vrtnws.model.MatchStatus
 import be.vanmechelen.vrtnws.model.StreamItem
+import be.vanmechelen.vrtnws.tile.sportEmoji
 import be.vanmechelen.vrtnws.ui.components.CardColor
 import be.vanmechelen.vrtnws.ui.components.HandoffButton
 import be.vanmechelen.vrtnws.ui.components.LivePill
 
+/** Horizontal inset so section text clears the round screen's curve (matches the article reader). */
+private val BodyPadding = 20.dp
+
 /**
- * Single vertical scroll: score header → quick events → "Fase per fase" stream → recap.
- * The [match] provides the always-available header (teams + score); the fetched [MatchDetail]
- * fills in the sections below.
+ * Lead-hero match detail, mirroring the article reader: a full-bleed hero fills the top arc, then a
+ * single vertical scroll of sections below (quick events → "Fase per fase" stream → recap).
+ *
+ * Matches never carry a photo, so the hero is always the "replacement graphic" — a section-tinted
+ * diagonal-stripe field (green, since this screen is themed [Section.SPORT]) with the sport emoji as
+ * a large watermark, under a scrim. The scoreboard (competition kicker + teams + score + live pill)
+ * rides the lower part of the hero, flowing downward like an article title — so a long name or a
+ * tennis set-score simply continues onto the black below rather than clipping into the top arc.
+ *
+ * Like the article reader this is a plain [Column] + [verticalScroll] + [rotaryScrollable] (NOT a
+ * ScalingLazyColumn, which scales the first item and would break the full-bleed hero), with the
+ * same `graphicsLayer(Offscreen)` + `BlendMode.DstIn` gradient fading both scroll edges. The [match]
+ * provides the always-available hero; the fetched [MatchDetail] fills the sections below.
  */
 @OptIn(androidx.wear.compose.foundation.ExperimentalWearFoundationApi::class)
 @Composable
@@ -59,97 +85,196 @@ fun MatchDetailScreen(
     onOpenOnPhone: (String) -> Unit,
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
-    val listState = rememberScalingLazyListState()
+    val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    // The scrollable Column lives inside BoxWithConstraints (a SubcomposeLayout), so the rotary
+    // focus node isn't attached on the first frame and a lone entry request is lost (dead crown).
+    // Key on `ui` so it re-fires when the detail settles (Loading→Ready/Failed), a recomposition
+    // that lands after layout when the node exists — same fix the article reader uses.
+    LaunchedEffect(ui) { runCatching { focusRequester.requestFocus() } }
 
-    ScalingLazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxWidth()
-            .rotaryScrollable(RotaryScrollableDefaults.behavior(listState), focusRequester),
-        autoCentering = null,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 44.dp),
-    ) {
-        item { ScoreHeader(match) }
+    val topFade by remember {
+        derivedStateOf { (scrollState.value / 80f).coerceIn(0f, 1f) }
+    }
 
-        when (val state = ui) {
-            is MatchDetailUiState.Loading -> item { CenteredProgress() }
-            is MatchDetailUiState.Failed -> item { FallbackNotice() }
-            is MatchDetailUiState.Ready -> matchDetailSections(state.detail)
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
+        val leadHeight = maxHeight * 0.52f
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0.0f to Color.Black.copy(alpha = 1f - topFade),
+                            0.10f to Color.Black,
+                            0.87f to Color.Black,
+                            1.0f to Color.Transparent,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
+                .verticalScroll(scrollState)
+                .rotaryScrollable(RotaryScrollableDefaults.behavior(scrollState), focusRequester),
+        ) {
+            MatchLeadHeader(match = match, height = leadHeight)
+            Spacer(Modifier.height(6.dp))
+
+            when (val state = ui) {
+                is MatchDetailUiState.Loading -> CenteredProgress()
+                is MatchDetailUiState.Failed -> FallbackNotice()
+                is MatchDetailUiState.Ready -> MatchSections(state.detail)
+            }
+
+            Spacer(Modifier.height(18.dp))
+            Box(Modifier.fillMaxWidth().padding(horizontal = BodyPadding), Alignment.Center) {
+                HandoffButton(
+                    onClick = { onOpenOnPhone(viewModel.matchUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(44.dp))
         }
-
-        item {
-            Spacer(Modifier.height(10.dp))
-            HandoffButton(
-                onClick = { onOpenOnPhone(viewModel.matchUrl) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-private fun androidx.wear.compose.foundation.lazy.ScalingLazyListScope.matchDetailSections(
-    detail: MatchDetail,
-) {
-    if (detail.isEmpty) {
-        item { FallbackNotice() }
-        return
-    }
-    if (detail.events.isNotEmpty()) {
-        item { SectionTitle(R.string.match_events) }
-        items(detail.events.size) { i -> EventRow(detail.events[i]) }
-    }
-    if (detail.stream.isNotEmpty()) {
-        item { SectionTitle(R.string.match_stream) }
-        items(detail.stream.size) { i -> StreamRow(detail.stream[i]) }
-    }
-    if (detail.recap.isNotEmpty()) {
-        item { SectionTitle(R.string.match_recap) }
-        items(detail.recap.size) { i -> BlockText(detail.recap[i]) }
     }
 }
 
 @Composable
-private fun ScoreHeader(match: Match) {
+private fun MatchSections(detail: MatchDetail) {
+    if (detail.isEmpty) {
+        FallbackNotice()
+        return
+    }
+    if (detail.events.isNotEmpty()) {
+        SectionTitle(R.string.match_events)
+        detail.events.forEach { EventRow(it) }
+    }
+    if (detail.stream.isNotEmpty()) {
+        SectionTitle(R.string.match_stream)
+        detail.stream.forEach { StreamRow(it) }
+    }
+    if (detail.recap.isNotEmpty()) {
+        SectionTitle(R.string.match_recap)
+        detail.recap.forEach { BlockText(it) }
+    }
+}
+
+/**
+ * The lead slot: a sport-tinted stripe field with the sport emoji watermark bleeding to the top arc
+ * under a scrim, with the competition kicker + scoreboard riding the lower part and flowing down.
+ */
+@Composable
+private fun MatchLeadHeader(match: Match, height: Dp) {
     val live = match.status == MatchStatus.LIVE
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (!match.competition.isNullOrBlank()) {
+    val accent = MaterialTheme.colors.secondary
+    Box(Modifier.fillMaxWidth()) {
+        // Replacement graphic + scrim: fixed height, pinned to the top arc.
+        Box(Modifier.fillMaxWidth().height(height)) {
+            Box(Modifier.fillMaxSize().background(stripeBrush()))
+            // Sport emoji watermark, sitting in the upper third above the scoreboard.
             Text(
-                text = match.competition.uppercase(),
-                style = MaterialTheme.typography.caption3,
-                color = MaterialTheme.colors.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+                text = sportEmoji(match.sportSlug),
+                fontSize = 66.sp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = height * 0.10f)
+                    .graphicsLayer { alpha = 0.22f },
             )
-            Spacer(Modifier.height(8.dp))
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.20f to Color.Transparent,
+                            0.55f to Color.Black.copy(alpha = 0.55f),
+                            1.0f to Color.Black,
+                        ),
+                    ),
+            )
         }
-        val two = match.home != null && match.away != null
-        if (two) {
-            Text(match.home!!, style = MaterialTheme.typography.title2, textAlign = TextAlign.Center)
-        }
-        Text(
-            text = match.score ?: match.statusText.ifBlank { "—" },
-            style = MaterialTheme.typography.display1,
-            color = if (live) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface,
-            modifier = Modifier.padding(vertical = 2.dp),
-        )
-        if (two) {
-            Text(match.away!!, style = MaterialTheme.typography.title2, textAlign = TextAlign.Center)
-        } else if (match.score != null) {
-            Text(match.title, style = MaterialTheme.typography.title3, textAlign = TextAlign.Center)
-        }
-        if (live) {
-            Spacer(Modifier.height(10.dp))
-            LivePill(text = liveLabel(match.statusText))
-        } else if (match.score != null && match.statusText.isNotBlank()) {
-            Spacer(Modifier.height(4.dp))
+        // Kicker + scoreboard, anchored into the hero's lower part and flowing down.
+        Column(
+            Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .padding(top = height * 0.34f)
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            matchKicker(match)?.let { kicker ->
+                Text(
+                    text = kicker.uppercase(),
+                    style = MaterialTheme.typography.caption3,
+                    color = accent,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+            }
+            val two = match.home != null && match.away != null
+            val titleShadow = Shadow(
+                color = Color.Black.copy(alpha = 0.7f),
+                offset = Offset(0f, 2f),
+                blurRadius = 14f,
+            )
+            if (two) {
+                Text(
+                    text = match.home!!,
+                    style = MaterialTheme.typography.title2.copy(shadow = titleShadow),
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                )
+            }
             Text(
-                text = match.statusText,
-                style = MaterialTheme.typography.caption1,
-                color = MaterialTheme.colors.onSurfaceVariant,
+                text = match.score ?: match.statusText.ifBlank { "—" },
+                style = MaterialTheme.typography.display1.copy(shadow = titleShadow),
+                color = if (live) MaterialTheme.colors.primary else Color.White,
+                modifier = Modifier.padding(vertical = 2.dp),
             )
+            if (two) {
+                Text(
+                    text = match.away!!,
+                    style = MaterialTheme.typography.title2.copy(shadow = titleShadow),
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                )
+            } else if (match.score != null) {
+                Text(
+                    text = match.title,
+                    style = MaterialTheme.typography.title3.copy(shadow = titleShadow),
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (live) {
+                Spacer(Modifier.height(10.dp))
+                LivePill(text = liveLabel(match.statusText))
+            } else if (match.score != null && match.statusText.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = match.statusText,
+                    style = MaterialTheme.typography.caption1,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
         }
     }
+}
+
+/** Diagonal-stripe replacement graphic, tinted to the section accent (green on this SPORT screen). */
+@Composable
+private fun stripeBrush(): Brush {
+    val base = MaterialTheme.colors.primaryVariant
+    val a = base.copy(alpha = 0.55f).compositeOver(MaterialTheme.colors.background)
+    val b = base.copy(alpha = 0.32f).compositeOver(MaterialTheme.colors.background)
+    return Brush.linearGradient(
+        0.00f to a, 0.25f to a, 0.25f to b, 0.50f to b,
+        0.50f to a, 0.75f to a, 0.75f to b, 1.00f to b,
+        start = Offset(0f, 0f),
+        end = Offset(44f, 44f),
+        tileMode = androidx.compose.ui.graphics.TileMode.Repeated,
+    )
 }
 
 private fun liveLabel(statusText: String): String =
@@ -161,7 +286,7 @@ private fun SectionTitle(res: Int) {
         text = stringResource(res),
         style = MaterialTheme.typography.title3,
         color = MaterialTheme.colors.secondary,
-        modifier = Modifier.padding(top = 16.dp, bottom = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = BodyPadding).padding(top = 16.dp, bottom = 6.dp),
     )
 }
 
@@ -170,6 +295,7 @@ private fun EventRow(event: MatchEvent) {
     Row(
         Modifier
             .fillMaxWidth()
+            .padding(horizontal = BodyPadding)
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(CardColor)
@@ -206,7 +332,7 @@ private fun eventIcon(type: MatchEventType): String = when (type) {
 
 @Composable
 private fun StreamRow(item: StreamItem) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = BodyPadding).padding(vertical = 5.dp)) {
         val heading = listOfNotNull(item.time?.takeIf { it.isNotBlank() }, item.title?.takeIf { it.isNotBlank() })
             .joinToString(" · ")
         if (heading.isNotBlank()) {
@@ -233,19 +359,19 @@ private fun BlockText(block: ContentBlock) {
             text = block.text,
             style = MaterialTheme.typography.title2,
             color = MaterialTheme.colors.secondary,
-            modifier = Modifier.padding(top = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = BodyPadding).padding(top = 10.dp),
         )
         BlockType.QUOTE -> Text(
             text = block.text,
             style = MaterialTheme.typography.body1.copy(fontStyle = FontStyle.Italic),
             color = MaterialTheme.colors.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = BodyPadding).padding(vertical = 4.dp),
         )
         BlockType.PARAGRAPH -> Text(
             text = block.text,
             style = MaterialTheme.typography.body2,
             color = MaterialTheme.colors.onSurface.copy(alpha = 0.88f),
-            modifier = Modifier.padding(vertical = 3.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = BodyPadding).padding(vertical = 3.dp),
         )
     }
 }
@@ -256,7 +382,7 @@ private fun FallbackNotice() {
         text = stringResource(R.string.match_load_error),
         style = MaterialTheme.typography.body1,
         color = MaterialTheme.colors.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = BodyPadding).padding(vertical = 8.dp),
     )
 }
 
