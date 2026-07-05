@@ -103,6 +103,18 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
 - **Rotary focus**: use `remember { FocusRequester() }` + `LaunchedEffect { requestFocus() }`,
   NOT `rememberActiveFocusRequester()` (crashes: "FocusRequester is not initialized" — no
   HierarchicalFocusCoordinator here). In the pager, gate focus to the active page.
+  **The requester only attaches to the scrollable it's a modifier on, so `requestFocus()` must
+  not fire before that node is composed.** In screens where the scrollable lives in a `when`
+  `else` branch (list screens gate it behind loading/error/empty states), keying the effect on
+  `isActive` alone loses the request that fires during loading — the crown then stays dead until
+  the page is swiped away and back. Key the effect on `isActive` **and** a "content is showing"
+  flag mirroring the branch condition (Headlines/Categories/Matches do this). MatchDetail composes
+  the scrollable unconditionally (spinner *inside* it) so `LaunchedEffect(Unit)` is enough there.
+  **The Article reader is the subtle one:** its scrollable `Column` sits inside `BoxWithConstraints`
+  (a `SubcomposeLayout`), so the rotary focus node is composed in the *layout* pass, after the
+  first-frame `LaunchedEffect(Unit)` — a lone entry request is lost and the crown stays dead. It
+  keys the effect on the `ui` state instead, so the request re-fires when the body settles
+  (Loading→Ready), a recomposition that lands after layout when the node exists.
 - **Article reader is lead-image-first, and NOT a `ScalingLazyColumn`** — it's a plain
   `Column(verticalScroll)` + `rotaryScrollable`, with a `graphicsLayer(Offscreen)` +
   `drawWithContent`/`BlendMode.DstIn` gradient that fades both scroll edges (the top fade ramps in

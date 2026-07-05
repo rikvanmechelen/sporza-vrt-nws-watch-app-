@@ -86,7 +86,13 @@ fun MatchesScreen(
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(isActive) { if (isActive) runCatching { focusRequester.requestFocus() } }
+    // Re-request once the list is showing too: the scrollable the requester attaches to isn't
+    // composed during the loading/error/empty states, so a request that fires while still loading
+    // is lost (dead crown until swiped away and back). Mirror the `else` branch's condition.
+    val listShown = !ui.isInitialLoading && !ui.showError && !(ui.matches.isEmpty() && !ui.isRefreshing)
+    LaunchedEffect(isActive, listShown) {
+        if (isActive && listShown) runCatching { focusRequester.requestFocus() }
+    }
 
     when {
         ui.isInitialLoading -> LoadingState()

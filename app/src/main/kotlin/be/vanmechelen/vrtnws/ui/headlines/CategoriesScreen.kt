@@ -55,7 +55,13 @@ fun CategoriesScreen(
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(isActive) { if (isActive) runCatching { focusRequester.requestFocus() } }
+    // Re-request once content is ready too: the scrollable the requester attaches to isn't
+    // composed during loading/error, so a request that fires while still loading is lost (dead
+    // crown until swiped away and back).
+    val contentReady = !ui.isInitialLoading && !ui.showError
+    LaunchedEffect(isActive, contentReady) {
+        if (isActive && contentReady) runCatching { focusRequester.requestFocus() }
+    }
 
     val tiles = remember(ui.articles) { categoryTiles(ui.articles) }
 

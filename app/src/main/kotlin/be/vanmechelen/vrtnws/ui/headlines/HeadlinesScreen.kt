@@ -54,8 +54,14 @@ fun HeadlinesScreen(
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
-    // Only the visible pager page should own the rotary crown focus.
-    LaunchedEffect(isActive) { if (isActive) runCatching { focusRequester.requestFocus() } }
+    // Only the visible pager page should own the rotary crown focus. Re-request once content is
+    // ready too: the scrollable (which the requester attaches to) isn't composed during the
+    // loading/error states, so a focus request that fires while this page is still loading would
+    // otherwise be lost and the crown would stay dead until the page is swiped away and back.
+    val contentReady = !ui.isInitialLoading && !ui.showError
+    LaunchedEffect(isActive, contentReady) {
+        if (isActive && contentReady) runCatching { focusRequester.requestFocus() }
+    }
 
     val articles = if (selection == null) ui.articles else ui.articles.filter(selection::matches)
 

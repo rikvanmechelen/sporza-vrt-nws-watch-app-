@@ -78,7 +78,11 @@ fun ArticleScreen(
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    // The scrollable Column lives inside the BoxWithConstraints below — a SubcomposeLayout — so its
+    // rotary focus node isn't attached on the first frame, and a single requestFocus() on entry is
+    // lost (dead crown). Key on `ui` so it re-fires when the body settles (Loading→Ready/Failed), a
+    // recomposition that lands after layout when the node is present.
+    LaunchedEffect(ui) { runCatching { focusRequester.requestFocus() } }
 
     // Top fade ramps in over the first ~40dp of scroll, so the lead image sits flush to the arc
     // at rest but content fades under the curve once you start reading.
