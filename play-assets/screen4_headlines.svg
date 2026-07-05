@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" font-family="Noto Sans, sans-serif">
+  <defs>
+    <clipPath id="round"><circle cx="240" cy="240" r="240"/></clipPath>
+  </defs>
+  <rect width="480" height="480" fill="#000000"/>
+  <g clip-path="url(#round)">
+    <!-- page dots -->
+    <circle cx="204" cy="30" r="5.5" fill="#A99CFF"/>
+    <circle cx="226" cy="30" r="4.5" fill="#3a3a3f"/>
+    <circle cx="248" cy="30" r="4.5" fill="#3a3a3f"/>
+    <circle cx="270" cy="30" r="4.5" fill="#3a3a3f"/>
+
+    <text x="240" y="118" text-anchor="middle" font-size="40" font-weight="700" fill="#A99CFF">Kort</text>
+
+    <!-- card 1 -->
+    <rect x="26" y="150" width="428" height="112" rx="26" fill="#17171B"/>
+    <text x="52" y="182" font-size="13" font-weight="700" fill="#C7C0FF" letter-spacing="0.6">LOREM</text>
+    <text x="52" y="212" font-size="21" font-weight="700" fill="#FFFFFF">Lorem ipsum dolor sit</text>
+    <text x="52" y="238" font-size="21" font-weight="700" fill="#FFFFFF">amet consectetur elit</text>
+
+    <!-- card 2 -->
+    <rect x="26" y="276" width="428" height="112" rx="26" fill="#17171B"/>
+    <text x="52" y="308" font-size="13" font-weight="700" fill="#C7C0FF" letter-spacing="0.6">DOLOR</text>
+    <text x="52" y="338" font-size="21" font-weight="700" fill="#FFFFFF">Sed do eiusmod tempor</text>
+    <text x="52" y="364" font-size="21" font-weight="700" fill="#FFFFFF">incididunt ut labore</text>
+
+    <!-- card 3 peek -->
+    <rect x="26" y="402" width="428" height="112" rx="26" fill="#17171B"/>
+    <text x="52" y="434" font-size="13" font-weight="700" fill="#C7C0FF" letter-spacing="0.6">AMET</text>
+    <text x="52" y="464" font-size="21" font-weight="700" fill="#FFFFFF">Ut enim ad minim veniam</text>
+  </g>
+</svg>

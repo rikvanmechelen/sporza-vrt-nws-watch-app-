@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" font-family="Noto Sans, sans-serif">
+  <defs>
+    <clipPath id="round"><circle cx="240" cy="240" r="240"/></clipPath>
+  </defs>
+  <rect width="480" height="480" fill="#000000"/>
+  <g clip-path="url(#round)">
+    <!-- page dots -->
+    <circle cx="204" cy="30" r="4.5" fill="#3a3a3f"/>
+    <circle cx="226" cy="30" r="4.5" fill="#3a3a3f"/>
+    <circle cx="248" cy="30" r="4.5" fill="#3a3a3f"/>
+    <circle cx="270" cy="30" r="5.5" fill="#2FE07A"/>
+
+    <!-- title + refresh -->
+    <text x="222" y="132" text-anchor="middle" font-size="42" font-weight="700" fill="#2FE07A">Matches</text>
+    <g transform="translate(340,120)" stroke="#2FE07A" stroke-width="3.6" fill="none" stroke-linecap="round">
+      <path d="M 13,-2 A 13,13 0 1 1 4,-12"/>
+      <path d="M 15,-11 L 13,-1 L 4,-4 Z" fill="#2FE07A" stroke="none"/>
+    </g>
+
+    <!-- section label -->
+    <text x="45" y="198" font-size="23" font-weight="700" fill="#2FE07A">Uitgelicht</text>
+
+    <!-- featured card -->
+    <rect x="26" y="236" width="428" height="176" rx="30" fill="#17171B" stroke="#1d3b31" stroke-width="1.5"/>
+    <text x="58" y="285" font-size="15" font-weight="700" fill="#A6AAB2" letter-spacing="0.6">LOREM IPSUM DOLOR</text>
+    <text x="58" y="326" font-size="31" font-weight="700" fill="#FFFFFF">Loremia</text>
+    <text x="58" y="366" font-size="31" font-weight="700" fill="#FFFFFF">Ipsumdor</text>
+    <text x="345" y="352" text-anchor="middle" font-size="42" font-weight="700" fill="#2FE07A">0 - 0</text>
+    <circle cx="412" cy="336" r="6" fill="#FF5147"/>
+    <text x="412" y="378" text-anchor="middle" font-size="15" fill="#A6AAB2">live</text>
+
+    <!-- next card peek -->
+    <rect x="60" y="432" width="360" height="70" rx="26" fill="#141318"/>
+    <text x="240" y="456" text-anchor="middle" font-size="14" font-weight="700" fill="#6b6f77" letter-spacing="0.5">LOREM DOLOR · SIT AMET</text>
+  </g>
+</svg>

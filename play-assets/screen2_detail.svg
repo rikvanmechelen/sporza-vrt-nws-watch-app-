@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" font-family="Noto Sans, sans-serif">
+  <defs>
+    <clipPath id="round"><circle cx="240" cy="240" r="240"/></clipPath>
+    <pattern id="stripes" width="46" height="46" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <rect width="46" height="46" fill="#0a5e4a"/>
+      <rect width="23" height="46" fill="#0c6b52"/>
+    </pattern>
+    <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.18" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="0.55" stop-color="#000000" stop-opacity="0.5"/>
+      <stop offset="0.82" stop-color="#000000" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="480" fill="#000000"/>
+  <g clip-path="url(#round)">
+    <rect x="0" y="0" width="480" height="300" fill="url(#stripes)"/>
+    <text x="240" y="205" text-anchor="middle" font-size="150" opacity="0.30" fill="#000000">⚽</text>
+    <rect x="0" y="0" width="480" height="300" fill="url(#scrim)"/>
+    <rect x="0" y="300" width="480" height="180" fill="#000000"/>
+
+    <text x="240" y="214" text-anchor="middle" font-size="16" font-weight="700" fill="#8FE9BC" letter-spacing="1">LOREM IPSUM DOLOR</text>
+    <text x="240" y="256" text-anchor="middle" font-size="34" font-weight="700" fill="#FFFFFF">Loremia</text>
+    <text x="240" y="328" text-anchor="middle" font-size="62" font-weight="700" fill="#2FE07A">0 - 0</text>
+    <text x="240" y="386" text-anchor="middle" font-size="34" font-weight="700" fill="#FFFFFF">Ipsumdoria</text>
+
+    <!-- LIVE pill -->
+    <rect x="163" y="406" width="154" height="34" rx="17" fill="#FF5147" fill-opacity="0.13"/>
+    <circle cx="196" cy="423" r="5" fill="#FF5147"/>
+    <text x="248" y="428" text-anchor="middle" font-size="17" font-weight="700" fill="#FF7A72">LIVE &#183; 45'</text>
+  </g>
+</svg>
