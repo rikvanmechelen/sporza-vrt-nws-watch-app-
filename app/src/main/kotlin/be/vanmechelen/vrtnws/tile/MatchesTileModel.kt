@@ -30,7 +30,9 @@ fun matchesTileModel(matches: List<Match>, maxRows: Int = 3): MatchesTileModel {
     // id — the match's true identity — which also catches repeats whose URLs differ only in
     // formatting (trailing slash, fragment), unlike the parser's URL-based dedup.
     val unique = matches.distinctBy { it.id }
-    val live = unique.filter { it.status == MatchStatus.LIVE }
+    // Featured (Sporza-promoted) matches lead; sortedBy is stable, so sport-rank order is kept
+    // within each group. `!featured` puts featured (false) first.
+    val live = unique.filter { it.status == MatchStatus.LIVE }.sortedBy { !it.featured }
     if (live.isNotEmpty()) {
         return MatchesTileModel(
             rows = live.take(maxRows),
@@ -38,7 +40,7 @@ fun matchesTileModel(matches: List<Match>, maxRows: Int = 3): MatchesTileModel {
             isLive = true,
         )
     }
-    val next = unique.firstOrNull { it.status == MatchStatus.UPCOMING }
+    val next = unique.filter { it.status == MatchStatus.UPCOMING }.sortedBy { !it.featured }.firstOrNull()
     return MatchesTileModel(
         rows = listOfNotNull(next),
         moreLiveCount = 0,

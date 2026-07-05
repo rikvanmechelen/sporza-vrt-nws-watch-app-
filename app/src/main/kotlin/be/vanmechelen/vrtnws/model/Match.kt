@@ -31,6 +31,12 @@ data class Match(
     val title: String,
     /** Secondary score shown small next to [score]: the current-set games in tennis ("4-3"). */
     val subScore: String? = null,
+    /**
+     * True when Sporza promotes this fixture in the calendar's "livestream-card" carousel (the
+     * marquee matches — e.g. World Cup knockouts). Also set on a scoreboard match that is promoted,
+     * even though its duplicate card is dropped. Drives "featured first" ordering in the list + tile.
+     */
+    val featured: Boolean = false,
 )
 
 /** Ordering + display labels for the per-sport sections. Voetbal first, unknowns last. */

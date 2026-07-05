@@ -48,17 +48,25 @@ import be.vanmechelen.vrtnws.ui.components.LoadingState
 import be.vanmechelen.vrtnws.ui.components.OfflineBanner
 import be.vanmechelen.vrtnws.ui.components.SectionHeader
 
-/** A row in the matches list: either a per-sport section header or a match card. */
+/** A row in the matches list: a section header (featured or per-sport) or a match card. */
 private sealed interface MatchesEntry {
+    data object FeaturedHeader : MatchesEntry
     data class SportHeader(val slug: String) : MatchesEntry
     data class MatchCard(val match: Match) : MatchesEntry
 }
 
-// The list arrives already sorted voetbal-first; insert a header whenever the sport changes.
+// Sporza-promoted "featured" matches lead under an "Uitgelicht" header (any sport, kept in the
+// list's existing sport-rank order); the rest arrive already sorted voetbal-first, so we just
+// insert a per-sport header whenever the sport changes.
 private fun List<Match>.toEntries(): List<MatchesEntry> {
     val entries = mutableListOf<MatchesEntry>()
+    val (featured, rest) = partition { it.featured }
+    if (featured.isNotEmpty()) {
+        entries += MatchesEntry.FeaturedHeader
+        featured.forEach { entries += MatchesEntry.MatchCard(it) }
+    }
     var lastSport: String? = null
-    for (m in this) {
+    for (m in rest) {
         if (m.sportSlug != lastSport) {
             entries += MatchesEntry.SportHeader(m.sportSlug)
             lastSport = m.sportSlug
@@ -114,13 +122,16 @@ fun MatchesScreen(
                     items = entries,
                     key = {
                         when (it) {
+                            is MatchesEntry.FeaturedHeader -> "h-featured"
                             is MatchesEntry.SportHeader -> "h-${it.slug}"
                             is MatchesEntry.MatchCard -> "m-${it.match.detailUrl}"
                         }
                     },
                 ) { entry ->
                     when (entry) {
-                        is MatchesEntry.SportHeader -> SportHeader(entry.slug)
+                        is MatchesEntry.FeaturedHeader ->
+                            GroupHeader(stringResource(R.string.matches_featured))
+                        is MatchesEntry.SportHeader -> GroupHeader(MatchSports.label(entry.slug))
                         is MatchesEntry.MatchCard ->
                             MatchCard(entry.match, onClick = { onMatchClick(entry.match) })
                     }
@@ -131,9 +142,9 @@ fun MatchesScreen(
 }
 
 @Composable
-private fun SportHeader(slug: String) {
+private fun GroupHeader(title: String) {
     Text(
-        text = MatchSports.label(slug),
+        text = title,
         style = MaterialTheme.typography.caption1.copy(fontWeight = FontWeight.Bold),
         color = MaterialTheme.colors.secondary,
         modifier = Modifier

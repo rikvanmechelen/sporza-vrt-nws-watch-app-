@@ -92,12 +92,16 @@ object MatchCalendarParser {
         // those too — but skip any that duplicate a scoreboard we already have (that one has a
         // real detail link, the card only points at /nl/livestream/).
         val scoreboardKeys = scoreboard.map(::teamKey).toHashSet()
-        val cards = livestreamMatches(html)
-            .distinctBy { it.detailUrl }
-            .filterNot { teamKey(it) in scoreboardKeys }
+        val allCards = livestreamMatches(html).distinctBy { it.detailUrl }
+        val cards = allCards.filterNot { teamKey(it) in scoreboardKeys }
+
+        // Anything in the carousel is "featured" — including a scoreboard match that's also
+        // promoted (its card is dropped as a dup above, but the match is still featured).
+        val featuredKeys = allCards.map(::teamKey).toHashSet()
 
         // Group by sport (voetbal first, unknown last); stable within a sport = source order.
         return (scoreboard + cards)
+            .map { if (it.featured || teamKey(it) in featuredKeys) it.copy(featured = true) else it }
             .sortedBy { MatchSports.rank(it.sportSlug) }
     }
 

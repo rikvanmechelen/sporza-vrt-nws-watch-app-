@@ -24,6 +24,7 @@
     <string name="tile_matches_empty">Geen live wedstrijden</string>
     <string name="tile_matches_more">+%d meer →</string>
     <string name="source_matches">Matches</string>
+    <string name="matches_featured">Uitgelicht</string>
     <string name="matches_load_error">Kon wedstrijden niet laden</string>
     <string name="matches_empty">Geen matches vandaag</string>
     <string name="matches_empty_sub">Kom straks terug voor de volgende wedstrijden.</string>

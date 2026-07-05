@@ -85,7 +85,9 @@ extractors, and cached in memory (`DefaultMatchesRepository`) since scores are e
 
 - **List** — `MatchCalendarParser` parses `https://sporza.be/nl/kalender`. Each match is a
   `<a>` scoreboard whose href (`/nl/sport/{sport}/~{id}/`) gives the sport; matches are
-  grouped voetbal-first and de-duplicated (Sporza repeats featured fixtures). Scoreboard markup
+  grouped voetbal-first and de-duplicated (Sporza repeats featured fixtures). Matches that Sporza
+  **promotes** in its carousel are flagged `featured` and shown first — under an "Uitgelicht"
+  section at the top of the tab, and ahead of the rest on the live-scores tile. Scoreboard markup
   differs per sport, so `Match.home/away/score` are nullable and `Match.title` is the
   always-present fallback:
   - **football** = two `teamname` blocks (with logos) + a goal score (`3 - 2`);

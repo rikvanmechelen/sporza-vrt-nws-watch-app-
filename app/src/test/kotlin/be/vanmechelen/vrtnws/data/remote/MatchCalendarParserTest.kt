@@ -189,6 +189,20 @@ class MatchCalendarParserTest {
     }
 
     @Test
+    fun flagsPromotedCarouselMatchesAsFeatured() {
+        // Card-only marquee match → featured.
+        assertTrue("card-only Paraguay - Frankrijk is featured",
+            liveCal.first { it.home == "Paraguay" && it.away == "Frankrijk" }.featured)
+        // A promoted match that ALSO has a scoreboard: the card is dropped, but the surviving
+        // scoreboard entry must still be flagged featured.
+        val brazil = liveCal.single { it.home == "Brazilië" }
+        assertTrue("promoted scoreboard match stays featured", brazil.featured)
+        assertTrue("surviving entry is the scoreboard", brazil.detailUrl.contains("/sport/voetbal/~"))
+        // Non-promoted matches are not featured (only the carousel entries are).
+        assertTrue("some matches are not featured", liveCal.any { !it.featured })
+    }
+
+    @Test
     fun livestreamMatchesKeepUniqueKeysAndStayGrouped() {
         val urls = liveCal.map { it.detailUrl }
         assertEquals("no duplicate detail urls", urls.distinct().size, urls.size)

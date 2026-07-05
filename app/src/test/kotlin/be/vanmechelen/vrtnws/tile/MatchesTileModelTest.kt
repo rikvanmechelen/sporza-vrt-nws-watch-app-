@@ -13,10 +13,11 @@ private fun match(
     id: String,
     sport: String = "voetbal",
     status: MatchStatus = MatchStatus.UPCOMING,
+    featured: Boolean = false,
 ) = Match(
     id = id, sportSlug = sport, competition = "C", home = "H-$id", away = "A-$id",
     homeLogoUrl = null, awayLogoUrl = null, score = null, statusText = "",
-    status = status, detailUrl = "https://x/$id", title = "H-$id - A-$id",
+    status = status, detailUrl = "https://x/$id", title = "H-$id - A-$id", featured = featured,
 )
 
 class MatchesTileModelTest {
@@ -113,6 +114,30 @@ class MatchesTileModelTest {
         val model = matchesTileModel(live)
         assertEquals(listOf("a", "b", "c"), model.rows.map { it.id })
         assertEquals(0, model.moreLiveCount)
+    }
+
+    @Test
+    fun featuredLiveMatchesSortToTheFront() {
+        // Featured matches lead, regardless of list position; order is otherwise preserved.
+        val matches = listOf(
+            match("a", status = MatchStatus.LIVE),
+            match("feat", status = MatchStatus.LIVE, featured = true),
+            match("b", status = MatchStatus.LIVE),
+        )
+        val model = matchesTileModel(matches)
+        assertTrue(model.isLive)
+        assertEquals(listOf("feat", "a", "b"), model.rows.map { it.id })
+    }
+
+    @Test
+    fun featuredUpcomingIsPreferredInFallback() {
+        val matches = listOf(
+            match("soon", status = MatchStatus.UPCOMING),
+            match("feat", status = MatchStatus.UPCOMING, featured = true),
+        )
+        val model = matchesTileModel(matches)
+        assertFalse(model.isLive)
+        assertEquals(listOf("feat"), model.rows.map { it.id })
     }
 
     @Test

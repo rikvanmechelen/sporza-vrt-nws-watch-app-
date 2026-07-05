@@ -140,6 +140,13 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   `MatchesTileModel.kt` rewrites any `HH:mm` token from `Europe/Brussels` into
   `ZoneId.systemDefault()`, and is called at both render sites — `MatchesScreen.ScoreOrStatus`
   and (wrapping `matchMidText`) `MatchesTileService`. `matchMidText` itself stays pure.
+- **Featured matches lead.** `Match.featured` = the fixture is promoted in Sporza's carousel
+  (`livestreamMatches`' team-keys — including a scoreboard match that's also promoted, whose
+  duplicate card is dropped). The parser keeps its sport-rank sort (so the `groupsVoetbalFirst`
+  contract holds); "featured first" is applied per consumer: the list (`MatchesScreen.toEntries`)
+  pulls featured into an **"Uitgelicht"** section above the per-sport sections, and the tile
+  (`matchesTileModel`) uses `sortedBy { !featured }` (stable) for both the live rows and the
+  upcoming fallback.
 - Round screen: list/reader content needs horizontal `contentPadding` or text clips on the curve.
 - Wear `HorizontalPageIndicator` forces itself to the bottom; the top dots are a custom Row.
 - **Tiles don't scroll** — ProtoLayout has no `LazyColumn`. `MatchesTileService` shows a fixed
