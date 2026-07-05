@@ -114,7 +114,10 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   tennis = two `setsPlayer` sides (names via `[class*=name]`.ownText, dropping the `playername`
   wrapper + ranking `meta`), score = **sets won** with the live set's games in `Match.subScore`
   from the `_set_` spans (note the delimited `_set_`/`_sets_` vs `setsPlayer`/`setsPlayers`);
-  cycling = no teams. The calendar is also `distinctBy { detailUrl }` — Sporza repeats featured
+  cycling = no teams. **Status**: `_live_` class or hidden "live" → LIVE, `notStarted`/`vandaag`/a
+  time → UPCOMING, `end`/"afgelopen"/"einde" → FINISHED — plus Sporza's **`nu`** ("now") label
+  (on court, no `_live_` class or score yet) is treated as LIVE, else it would linger as an
+  "upcoming" fixture showing a now-past kickoff time. The calendar is also `distinctBy { detailUrl }` — Sporza repeats featured
   fixtures — and the tile additionally dedups by `id` (catches url-variant repeats).
   Detail regions: field-timeline `[class*=hoverLabel]` (events), `.sw-timeline-item` (stream),
   article prose minus live widgets (recap). A per-match live-scoreboard JSON API exists

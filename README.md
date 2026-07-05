@@ -99,6 +99,9 @@ extractors, and cached in memory (`DefaultMatchesRepository`) since scores are e
   live widgets, reusing `ContentBlock`). Empty result → "Open op telefoon" fallback.
 - Sporza uses hashed CSS-module class names (`_scoreboard_mdatp_36`), so selectors match on
   `[class*=prefix]`, never exact names — the single place to adjust if Sporza changes markup.
+- **Status** is read from the scoreboard's CSS state and a11y text (LIVE / UPCOMING / FINISHED).
+  A match Sporza labels `nu` ("now" — on court, but no live class or score yet) counts as live, so
+  a just-started match isn't left showing its (now-past) kickoff time as if still upcoming.
 - **Kickoff times** — scoreboard fixtures carry the kickoff in their text, but Sporza's promoted
   "livestream-card" carousel matches carry only a TV *broadcast window* (which starts a variable
   10–30 min before kickoff). For those, `ScheduleParser` reads the real kickoff from the schedule

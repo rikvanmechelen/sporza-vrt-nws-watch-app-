@@ -52,7 +52,12 @@ object MatchCalendarParser {
             val score = footballScore ?: tennis?.sets
             val label = scoreWrap?.selectFirst("[class*=label]")?.text()?.trim()
                 ?.takeIf { it.isNotBlank() }
-            val live = a.className().contains("live") || scoreClass?.contains("live") == true
+            // Sporza tags a match that's on court right now "nu" ("now") — no _live_ class and no
+            // score yet (it just started), but it's in play, not upcoming. Treat it as live so it
+            // doesn't linger as an "upcoming" fixture with a now-past kickoff time.
+            val playingNow = label.equals("nu", ignoreCase = true) ||
+                hidden.trimEnd().endsWith(", nu", ignoreCase = true)
+            val live = playingNow || a.className().contains("live") || scoreClass?.contains("live") == true
 
             val status = statusOf(scoreClass, hidden, live)
             val title = when {

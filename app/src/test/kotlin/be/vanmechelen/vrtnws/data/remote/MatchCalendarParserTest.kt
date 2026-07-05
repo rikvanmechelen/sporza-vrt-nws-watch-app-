@@ -71,6 +71,16 @@ class MatchCalendarParserTest {
     }
 
     @Test
+    fun classifiesNowPlayingMatchesAsLive() {
+        // Sporza labels an on-court match "nu" ("now") — it has no _live_ class and no score yet
+        // (it just started), but it IS in play, not upcoming. It must be LIVE, not UNKNOWN.
+        val fritz = matches.first { it.home == "Taylor Fritz" }
+        assertEquals(MatchStatus.LIVE, fritz.status)
+        // And it should never masquerade as an upcoming match with a (now-past) kickoff clock.
+        assertEquals(null, fritz.score)
+    }
+
+    @Test
     fun tennisSinglesParsesBothPlayers() {
         val m = matches.first { it.home == "Jasmine Paolini" }
         assertEquals("Maria Sakkari", m.away)
