@@ -1,8 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+// Release signing: the Play upload key lives in an un-committed `keystore.properties`
+// (see .gitignore). When it's absent — CI, a fresh clone, another machine — the release
+// build falls back to the debug key so it still builds/installs for local sideload.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val hasReleaseKeystore = keystorePropsFile.exists()
+val keystoreProps = Properties().apply {
+    if (hasReleaseKeystore) keystorePropsFile.inputStream().use { load(it) }
 }
 
 android {
@@ -19,12 +30,29 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Personal sideload: sign release with the debug key so `installRelease` works.
-            // debuggable is false here (unlike debug) -> ART fully optimises, which is the
-            // main reason release scrolling is dramatically smoother than debug.
-            signingConfig = signingConfigs.getByName("debug")
+            // Signed with the Play upload key when keystore.properties is present, else the debug
+            // key (see the top-of-file note). Either way debuggable is false -> ART fully optimises,
+            // which is the main reason release scrolling is dramatically smoother than debug.
+            // Caveat: an upload-key-signed release can't be sideloaded *over* an existing
+            // debug-signed install of the same package (signature mismatch) — `adb uninstall` first.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

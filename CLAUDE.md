@@ -32,10 +32,21 @@ export ANDROID_HOME=$HOME/Android/Sdk           # adb at $ANDROID_HOME/platform-
 - Instrumented / Compose UI tests (need a device — target the emulator explicitly):
   `ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest`
 - Iterate on emulator: `ANDROID_SERIAL=emulator-5554 ./gradlew :app:installDebug`
-- Release build: `./gradlew :app:assembleRelease` (per-ABI APKs; ABI splits are on)
+- Release build (sideload APKs): `./gradlew :app:assembleRelease` (per-ABI APKs; ABI splits are on)
 - Push release to watch:
   `adb -s adb-5A231WRBNL30KN-VRzvYX._adb-tls-connect._tcp install -r \
      app/build/outputs/apk/release/app-armeabi-v7a-release.apk`
+- Play upload artifact: `./gradlew :app:bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`
+
+### Release signing (Play upload key)
+Release is signed with a real **upload key** when `keystore.properties` (repo root, gitignored) is
+present — it names `storeFile=upload-keystore.jks` (also gitignored) + passwords/alias. Wired in
+`app/build.gradle.kts` (`signingConfigs.release`). When the file is **absent** (CI, fresh clone,
+another machine) release falls back to the **debug** key so it still builds for sideload. **Back up
+`upload-keystore.jks` + its password off-machine** — losing it means asking Google to reset the
+upload key. Caveat: an upload-key-signed release can't install *over* a debug-signed build of the
+same package (signature mismatch) — `adb uninstall be.vanmechelen.vrtnws` first. Google Play App
+Signing holds the real distribution key; this key only signs uploads.
 
 ### Devices
 - Emulator: `emulator-5554` (Wear AVD, API 36) — the iteration device.
