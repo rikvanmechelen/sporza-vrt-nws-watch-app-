@@ -77,7 +77,7 @@ adb -s emulator-5554 exec-out screencap -p > shot.png   # 480x480 round frame
 data/
   remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services,
           MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores),
-          ScheduleParser (regex over the schedule API JSON: real kickoff per fixture)
+          ScheduleParser (regex over the schedule API JSON: real kickoff/status/score per fixture)
   local/  Room: ArticleEntity (PK id+source) + ArticleBodyEntity (PK url) + BlockConverters,
           ArticleDao, NewsDatabase (v2), RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
@@ -105,7 +105,7 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   `Flow`; `body(url)` is cache-first, keyed by url.
 - **Matches** (`MatchesRepository`, in-memory — scores are ephemeral): `refresh()` scrapes the
   Sporza kalender via `MatchCalendarParser`, then (only if promoted carousel cards are present)
-  patches their real kickoff in from the schedule API via `ScheduleParser`/`applyScheduleKickoffs`;
+  enriches their real kickoff/status/score from the schedule API via `ScheduleParser`/`applySchedule`;
   `detail(url)` is cache-first via `MatchDetailExtractor`. No Room. Tap-to-refresh, no auto-polling.
 
 ## Gotchas (don't accidentally revert these)
@@ -172,15 +172,23 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   (`api.sporza.be/web/content/{sport}/matches/{id}`, poll `interval`) but is unused.
   The detail score header comes from the list `Match` snapshot; only events/stream/recap
   re-fetch on open (a live score can lag until the list is refreshed).
-- **Kickoff time comes from two places — only one is a real kickoff.** Scoreboard entries carry
-  the kickoff in their a11y hidden text (`"X tegen Y, vandaag om 22:00"`). But promoted
-  **livestream-card** carousel fixtures (`Match.id` prefixed `livestream-`, no scoreboard) carry
-  only a TV **broadcast window** (`"time":{"text":"20:30 - 23:20"}`) — the pre-show start, ~10–30
-  min before kickoff, and the lead varies per match so it can't be derived. `OkHttpMatchesService`
-  therefore enriches card matches from the **schedule API** `api.sporza.be/web/content/schedule?date=YYYY-MM-DD`
-  (the endpoint the calendar's own date-nav uses; fetched today..+2 days), whose `ariaLabel`
-  states the real kickoff. `ScheduleParser` regex-parses it (no JSON lib) → `applyScheduleKickoffs`
-  matches by team pair and overwrites only `livestream-`/`UPCOMING` cards' `statusText`.
+- **Promoted livestream-card matches carry only a *broadcast* state — enrich them from the schedule
+  API.** A scoreboard entry has the kickoff in its a11y text (`"X tegen Y, vandaag om 22:00"`) and,
+  once played, a real score. But promoted **livestream-card** carousel fixtures (`Match.id` prefixed
+  `livestream-`, no scoreboard) carry only the *TV broadcast* state: a broadcast window
+  (`"time":{"text":"20:30 - 23:20"}` — the pre-show start, ~10–30 min before kickoff, lead varies so
+  it can't be derived) and a broadcast **status that lingers `LIVE` after the final whistle** (studio
+  wrap-up still airing) — with **no score at all**. So a finished promoted match otherwise shows
+  "live" and no score. `OkHttpMatchesService` therefore enriches every card (any status) from the
+  **schedule API** `api.sporza.be/web/content/schedule?date=YYYY-MM-DD` (the endpoint the calendar's
+  own date-nav uses; fetched today..+2 days). `ScheduleParser` regex-parses each entry's `ariaLabel`
+  (no JSON lib) into `Fixture(home, away, kickoff?, status, score?)` — real kickoff (`"…, vandaag om
+  22:00"`), real match `status` (`END`→FINISHED / `LIVE` / `NOT_STARTED`,`AFTER_TODAY`→UPCOMING), and
+  the finished **football** score baked in as `"…, afgelopen, 1, 2, winnaar X"` (tennis uses "N sets"
+  phrasing and is gated out by `sport=="soccer"`). `applySchedule` matches by team pair and, for
+  `livestream-` cards only: promotes status **forward only** (upcoming→live→finished — never regress a
+  live card to upcoming on a stale row), fills in the score, and replaces the broadcast time with the
+  real kickoff while still upcoming. Scoreboard matches (numeric ids) are left untouched.
 - **Match times are Europe/Brussels wall-clock; display converts to the watch's zone.** Sporza
   (Belgian) renders every kickoff in CET/CEST as a bare `HH:mm` string, stored verbatim in
   `Match.statusText`. Conversion happens at the **display boundary** (parsing stays "what Sporza

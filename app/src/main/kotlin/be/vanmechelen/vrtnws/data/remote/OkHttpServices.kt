@@ -7,7 +7,6 @@ import be.vanmechelen.vrtnws.model.Article
 import be.vanmechelen.vrtnws.model.ArticleContent
 import be.vanmechelen.vrtnws.model.Match
 import be.vanmechelen.vrtnws.model.MatchDetail
-import be.vanmechelen.vrtnws.model.MatchStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -50,14 +49,14 @@ class OkHttpMatchesService(
 ) : MatchesService {
     override suspend fun fetchCalendar(): List<Match> {
         val matches = MatchCalendarParser.parse(client.getText(KALENDER_URL))
-        // Promoted "livestream-card" matches carry only a broadcast window, not a kickoff. When any
-        // are present, look up their real kickoff from the schedule API (which the calendar's own
-        // date-nav uses) and patch it in. Skip the extra fetches entirely when there are none.
-        val needsKickoff = matches.any {
-            it.id.startsWith("livestream-") && it.status == MatchStatus.UPCOMING &&
-                it.home != null && it.away != null
+        // Promoted "livestream-card" matches carry only a broadcast state (window time + a status
+        // that lingers "live" past the whistle), never a real kickoff/score. When any are present —
+        // whatever their broadcast status — look up their true state from the schedule API (which
+        // the calendar's own date-nav uses) and patch it in. Skip the fetches when there are none.
+        val needsSchedule = matches.any {
+            it.id.startsWith("livestream-") && it.home != null && it.away != null
         }
-        return if (needsKickoff) applyScheduleKickoffs(matches, fetchSchedule()) else matches
+        return if (needsSchedule) applySchedule(matches, fetchSchedule()) else matches
     }
 
     /**
