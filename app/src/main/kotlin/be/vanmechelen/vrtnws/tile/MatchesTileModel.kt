@@ -50,6 +50,22 @@ fun matchesTileModel(matches: List<Match>, maxRows: Int = 3): MatchesTileModel {
 fun matchMidText(match: Match, isLive: Boolean): String =
     match.score ?: match.statusText.ifBlank { if (isLive) "live" else "gepland" }
 
+/**
+ * Shortens a tennis player name so long (especially doubles) names fit a scoreboard row without
+ * pushing the score off. "Frances Tiafoe" → "F. Tiafoe", or "Tiafoe" when [surnameOnly].
+ * Multi-word surnames (particles) survive: "Alex de Minaur" → "A. de Minaur" / "de Minaur".
+ * Doubles pairs ("A/B") and single-token names are left untouched. Callers gate this on tennis;
+ * team names (football) must never be abbreviated.
+ */
+fun abbreviatePlayerName(name: String, surnameOnly: Boolean = false): String {
+    val trimmed = name.trim()
+    if ('/' in trimmed) return trimmed // doubles — don't mangle into one surname
+    val tokens = trimmed.split(" ").filter { it.isNotBlank() }
+    if (tokens.size < 2) return trimmed
+    val surname = tokens.drop(1).joinToString(" ")
+    return if (surnameOnly) surname else "${tokens.first().first().uppercaseChar()}. $surname"
+}
+
 /** Emoji that stands in for a sport, so a row reads at a glance without leaning on names. */
 fun sportEmoji(sportSlug: String): String = when (sportSlug) {
     "voetbal" -> "⚽"

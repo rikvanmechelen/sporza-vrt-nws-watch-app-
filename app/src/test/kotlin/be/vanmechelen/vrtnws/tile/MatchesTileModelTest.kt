@@ -149,4 +149,34 @@ class MatchesTileModelTest {
         assertEquals("🚗", sportEmoji("rally"))
         assertEquals("🚗", sportEmoji("rallycross"))
     }
+
+    @Test
+    fun abbreviatesPlayerToInitialPlusSurname() {
+        assertEquals("F. Tiafoe", abbreviatePlayerName("Frances Tiafoe"))
+        assertEquals("A. Bublik", abbreviatePlayerName("Alexander Bublik"))
+    }
+
+    @Test
+    fun abbreviatesToSurnameOnlyWhenRequested() {
+        assertEquals("Tiafoe", abbreviatePlayerName("Frances Tiafoe", surnameOnly = true))
+        assertEquals("Berrettini", abbreviatePlayerName("Matteo Berrettini", surnameOnly = true))
+    }
+
+    @Test
+    fun keepsSurnameParticles() {
+        // Multi-word surnames (particles) survive: initial + the rest.
+        assertEquals("A. de Minaur", abbreviatePlayerName("Alex de Minaur"))
+        assertEquals("de Minaur", abbreviatePlayerName("Alex de Minaur", surnameOnly = true))
+    }
+
+    @Test
+    fun leavesDoublesAndShortNamesUntouched() {
+        // Doubles pairs (a "/" separator) must not be mangled into one surname.
+        assertEquals("Tiafoe/Bublik", abbreviatePlayerName("Tiafoe/Bublik"))
+        // Already a single token — nothing to abbreviate.
+        assertEquals("Alcaraz", abbreviatePlayerName("Alcaraz"))
+        assertEquals("Alcaraz", abbreviatePlayerName("Alcaraz", surnameOnly = true))
+        // Blank stays blank.
+        assertEquals("", abbreviatePlayerName("   "))
+    }
 }

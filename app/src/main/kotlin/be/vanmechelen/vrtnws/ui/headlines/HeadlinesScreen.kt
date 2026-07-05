@@ -1,47 +1,44 @@
 package be.vanmechelen.vrtnws.ui.headlines
 
 import android.text.format.DateUtils
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.foundation.lazy.itemsIndexed
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.ui.focus.FocusRequester
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
-import androidx.wear.compose.material.Card
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.CircularProgressIndicator
-import androidx.wear.compose.material.Icon
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import be.vanmechelen.vrtnws.R
 import be.vanmechelen.vrtnws.model.Article
+import be.vanmechelen.vrtnws.ui.components.ListCard
+import be.vanmechelen.vrtnws.ui.components.LoadingState
+import be.vanmechelen.vrtnws.ui.components.ErrorState
+import be.vanmechelen.vrtnws.ui.components.OfflineBanner
+import be.vanmechelen.vrtnws.ui.components.SectionHeader
 import coil.compose.AsyncImage
 
 @OptIn(androidx.wear.compose.foundation.ExperimentalWearFoundationApi::class)
@@ -63,66 +60,42 @@ fun HeadlinesScreen(
     val articles = if (selection == null) ui.articles else ui.articles.filter(selection::matches)
 
     when {
-        ui.isInitialLoading -> CenteredProgress()
-        ui.showError -> CenteredMessage(stringRes = R.string.load_error, onRetry = viewModel::refresh)
+        ui.isInitialLoading -> LoadingState()
+        ui.showError -> ErrorState(stringResource(R.string.load_error), onRetry = viewModel::refresh)
         else -> ScalingLazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .rotaryScrollable(RotaryScrollableDefaults.behavior(listState), focusRequester),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            autoCentering = null,
+            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 48.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                val refreshLabel = androidx.compose.ui.res.stringResource(R.string.refresh)
                 val headerText = when (selection) {
-                    null, CategorySelection.All -> androidx.compose.ui.res.stringResource(source.labelRes)
+                    null, CategorySelection.All -> stringResource(source.labelRes)
                     is CategorySelection.Topic ->
-                        selection.name ?: androidx.compose.ui.res.stringResource(R.string.category_other)
+                        selection.name ?: stringResource(R.string.category_other)
                 }
-                Row(
-                    modifier = Modifier
-                        .clickable(onClick = viewModel::refresh)
-                        .semantics { contentDescription = refreshLabel },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = headerText,
-                        style = MaterialTheme.typography.title3,
-                        color = MaterialTheme.colors.primary,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    if (ui.isRefreshing) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(android.R.drawable.stat_notify_sync),
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colors.primary,
-                        )
-                    }
-                }
+                SectionHeader(
+                    title = headerText,
+                    isRefreshing = ui.isRefreshing,
+                    onRefresh = viewModel::refresh,
+                )
             }
             if (ui.showOfflineBanner) {
-                item {
-                    Text(
-                        text = androidx.compose.ui.res.stringResource(R.string.offline),
-                        style = MaterialTheme.typography.caption2,
-                        color = MaterialTheme.colors.onSurfaceVariant,
-                    )
-                }
+                item { OfflineBanner() }
             }
-            items(articles, key = { it.id }) { article ->
-                HeadlineCard(article, onClick = { onArticleClick(article) })
+            itemsIndexed(articles, key = { _, a -> a.id }) { index, article ->
+                HeadlineCard(article, accent = index == 0, onClick = { onArticleClick(article) })
             }
         }
     }
 }
 
 @Composable
-private fun HeadlineCard(article: Article, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+private fun HeadlineCard(article: Article, accent: Boolean, onClick: () -> Unit) {
+    ListCard(onClick = onClick, accent = accent) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (article.imageUrl != null) {
                 AsyncImage(
@@ -130,52 +103,29 @@ private fun HeadlineCard(article: Article, onClick: () -> Unit) {
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .size(62.dp)
+                        .clip(RoundedCornerShape(16.dp)),
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(14.dp))
             }
             Column(Modifier.weight(1f)) {
                 Text(
                     text = article.title,
-                    style = MaterialTheme.typography.body2,
+                    style = MaterialTheme.typography.title2.copy(fontSize = 16.sp),
+                    color = MaterialTheme.colors.onSurface,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.size(7.dp))
                 val time = remember(article.publishedEpochMs) {
                     DateUtils.getRelativeTimeSpanString(article.publishedEpochMs).toString()
                 }
                 Text(
                     text = time,
-                    style = MaterialTheme.typography.caption3,
+                    style = MaterialTheme.typography.caption1,
                     color = MaterialTheme.colors.onSurfaceVariant,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun CenteredProgress() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
-}
-
-@Composable
-private fun CenteredMessage(stringRes: Int, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = androidx.compose.ui.res.stringResource(stringRes),
-                style = MaterialTheme.typography.body2,
-            )
-            Spacer(Modifier.height(8.dp))
-            Chip(
-                label = { Text(androidx.compose.ui.res.stringResource(R.string.refresh)) },
-                onClick = onRetry,
-                colors = ChipDefaults.primaryChipColors(),
-            )
         }
     }
 }

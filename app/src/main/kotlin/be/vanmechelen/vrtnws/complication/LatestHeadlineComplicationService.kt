@@ -12,35 +12,57 @@ import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import be.vanmechelen.vrtnws.R
 import be.vanmechelen.vrtnws.VrtNwsApp
+import be.vanmechelen.vrtnws.model.Article
 import be.vanmechelen.vrtnws.ui.MainActivity
 
-/** Shows the latest cached headline as a watch-face complication; tapping opens the app. */
+/**
+ * Shows the latest cached headline as a watch-face complication; tapping opens the app.
+ *
+ * The redesign gives both slots a "VRT NWS" identity via the complication title: SHORT_TEXT reads
+ * "NWS" + a compact age ("1u"), LONG_TEXT reads "VRT NWS" + the headline. Accent colour is the
+ * watch face's to control, so we lean on titles for identity rather than colour.
+ */
 class LatestHeadlineComplicationService : SuspendingComplicationDataSourceService() {
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
         val headline = runCatching { VrtNwsApp.instance.graph.repository.latestHeadline() }.getOrNull()
-        val text = headline?.title ?: getString(R.string.tile_latest)
-        return complicationData(request.complicationType, text)
+        return complicationData(request.complicationType, headline)
     }
 
     override fun getPreviewData(type: ComplicationType): ComplicationData =
-        complicationData(type, getString(R.string.tile_latest))
+        complicationData(type, null)
 
-    private fun complicationData(type: ComplicationType, text: String): ComplicationData {
-        val description: ComplicationText = PlainComplicationText.Builder(getString(R.string.tile_latest)).build()
+    private fun complicationData(type: ComplicationType, headline: Article?): ComplicationData {
+        val text = headline?.title ?: getString(R.string.tile_latest)
         val tap = launchAppIntent()
         return when (type) {
             ComplicationType.LONG_TEXT ->
-                LongTextComplicationData.Builder(PlainComplicationText.Builder(text).build(), description)
+                LongTextComplicationData.Builder(plain(text), descr())
+                    .setTitle(plain(getString(R.string.headlines_title)))
                     .setTapAction(tap)
                     .build()
-            else ->
-                ShortTextComplicationData.Builder(
-                    PlainComplicationText.Builder(text.take(20)).build(),
-                    description,
-                )
+            else -> {
+                val short = headline?.let { compactAge(it.publishedEpochMs) } ?: "•"
+                ShortTextComplicationData.Builder(plain(short), descr())
+                    .setTitle(plain(getString(R.string.complication_short_label)))
                     .setTapAction(tap)
                     .build()
+            }
+        }
+    }
+
+    private fun plain(text: String): ComplicationText = PlainComplicationText.Builder(text).build()
+
+    private fun descr(): ComplicationText = plain(getString(R.string.tile_latest))
+
+    /** Compact Dutch relative age for the tiny SHORT_TEXT slot: "nu", "5m", "1u", "3d". */
+    private fun compactAge(epochMs: Long): String {
+        val mins = (System.currentTimeMillis() - epochMs) / 60_000
+        return when {
+            mins < 1 -> "nu"
+            mins < 60 -> "${mins}m"
+            mins < 1_440 -> "${mins / 60}u"
+            else -> "${mins / 1_440}d"
         }
     }
 

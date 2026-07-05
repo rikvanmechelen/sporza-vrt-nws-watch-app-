@@ -1,51 +1,51 @@
 package be.vanmechelen.vrtnws.ui.matches
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.FocusRequester
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
-import androidx.wear.compose.material.Card
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.CircularProgressIndicator
-import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import be.vanmechelen.vrtnws.R
 import be.vanmechelen.vrtnws.model.Match
 import be.vanmechelen.vrtnws.model.MatchSports
 import be.vanmechelen.vrtnws.model.MatchStatus
+import be.vanmechelen.vrtnws.tile.abbreviatePlayerName
+import be.vanmechelen.vrtnws.ui.components.EmptyState
+import be.vanmechelen.vrtnws.ui.components.ErrorState
+import be.vanmechelen.vrtnws.ui.components.ListCard
+import be.vanmechelen.vrtnws.ui.components.LiveDot
+import be.vanmechelen.vrtnws.ui.components.LoadingState
+import be.vanmechelen.vrtnws.ui.components.OfflineBanner
+import be.vanmechelen.vrtnws.ui.components.SectionHeader
 
 /** A row in the matches list: either a per-sport section header or a match card. */
 private sealed interface MatchesEntry {
@@ -80,8 +80,14 @@ fun MatchesScreen(
     LaunchedEffect(isActive) { if (isActive) runCatching { focusRequester.requestFocus() } }
 
     when {
-        ui.isInitialLoading -> CenteredProgress()
-        ui.showError -> CenteredError(onRetry = viewModel::refresh)
+        ui.isInitialLoading -> LoadingState()
+        ui.showError -> ErrorState(stringResource(R.string.matches_load_error), onRetry = viewModel::refresh)
+        ui.matches.isEmpty() && !ui.isRefreshing ->
+            EmptyState(
+                iconRes = R.drawable.ic_empty_face,
+                title = stringResource(R.string.matches_empty),
+                subtitle = stringResource(R.string.matches_empty_sub),
+            )
         else -> {
             val entries = remember(ui.matches) { ui.matches.toEntries() }
             ScalingLazyColumn(
@@ -89,33 +95,19 @@ fun MatchesScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .rotaryScrollable(RotaryScrollableDefaults.behavior(listState), focusRequester),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                autoCentering = null,
+                contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 48.dp, bottom = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item {
-                    RefreshHeader(
+                    SectionHeader(
                         title = stringResource(R.string.source_matches),
                         isRefreshing = ui.isRefreshing,
                         onRefresh = viewModel::refresh,
                     )
                 }
                 if (ui.showOfflineBanner) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.offline),
-                            style = MaterialTheme.typography.caption2,
-                            color = MaterialTheme.colors.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (ui.matches.isEmpty() && !ui.isRefreshing) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.matches_empty),
-                            style = MaterialTheme.typography.body2,
-                            color = MaterialTheme.colors.onSurfaceVariant,
-                        )
-                    }
+                    item { OfflineBanner() }
                 }
                 items(
                     items = entries,
@@ -138,96 +130,89 @@ fun MatchesScreen(
 }
 
 @Composable
-private fun RefreshHeader(title: String, isRefreshing: Boolean, onRefresh: () -> Unit) {
-    val refreshLabel = stringResource(R.string.refresh)
-    Row(
-        modifier = Modifier
-            .clickable(onClick = onRefresh)
-            .semantics { contentDescription = refreshLabel },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.title3,
-            color = MaterialTheme.colors.primary,
-        )
-        Spacer(Modifier.width(6.dp))
-        if (isRefreshing) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-        } else {
-            Icon(
-                painter = androidx.compose.ui.res.painterResource(android.R.drawable.stat_notify_sync),
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colors.primary,
-            )
-        }
-    }
-}
-
-@Composable
 private fun SportHeader(slug: String) {
     Text(
         text = MatchSports.label(slug),
-        style = MaterialTheme.typography.caption1,
-        color = MaterialTheme.colors.onSurfaceVariant,
+        style = MaterialTheme.typography.caption1.copy(fontWeight = FontWeight.Bold),
+        color = MaterialTheme.colors.secondary,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, start = 4.dp),
+            .padding(top = 4.dp, start = 6.dp, bottom = 2.dp),
     )
 }
 
 @Composable
 private fun MatchCard(match: Match, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    val live = match.status == MatchStatus.LIVE
+    ListCard(onClick = onClick, accent = live) {
         Column(Modifier.fillMaxWidth()) {
             if (!match.competition.isNullOrBlank()) {
                 Text(
-                    text = match.competition,
+                    text = match.competition.uppercase(),
                     style = MaterialTheme.typography.caption3,
                     color = MaterialTheme.colors.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 5.dp),
                 )
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
+                    val teamStyle = MaterialTheme.typography.title2.copy(fontSize = 18.sp)
                     if (match.home != null && match.away != null) {
-                        Text(match.home, style = MaterialTheme.typography.body2, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(match.away, style = MaterialTheme.typography.body2, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(displayName(match, match.home), style = teamStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(displayName(match, match.away), style = teamStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     } else {
-                        Text(match.title, style = MaterialTheme.typography.body2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(match.title, style = teamStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                Spacer(Modifier.width(8.dp))
-                ScoreOrStatus(match)
+                Spacer(Modifier.width(12.dp))
+                ScoreOrStatus(match, live)
             }
         }
     }
 }
 
+/** Tennis player names shorten to "F. Tiafoe" so long (doubles) names don't crowd the score. */
+private fun displayName(match: Match, name: String): String =
+    if (match.sportSlug == "tennis") abbreviatePlayerName(name) else name
+
 @Composable
-private fun ScoreOrStatus(match: Match) {
-    val live = match.status == MatchStatus.LIVE
+private fun ScoreOrStatus(match: Match, live: Boolean) {
+    val hasScore = match.score != null
     Column(horizontalAlignment = Alignment.End) {
-        if (live) {
-            Box(
-                Modifier
-                    .padding(bottom = 2.dp)
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE53935)),
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val scoreColor = if (live) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface
+            if (hasScore && match.subScore != null) {
+                // Tennis: sets big, current-set games as a teal subscript on each side.
+                Text(
+                    text = tennisScore(match.score!!, match.subScore!!, MaterialTheme.colors.secondary),
+                    style = MaterialTheme.typography.title1.copy(fontWeight = FontWeight.ExtraBold),
+                    color = scoreColor,
+                )
+            } else {
+                Text(
+                    text = match.score ?: match.statusText.ifBlank { "—" },
+                    style = MaterialTheme.typography.title1.copy(
+                        fontWeight = if (hasScore) FontWeight.ExtraBold else FontWeight.Bold,
+                        fontFeatureSettings = "tnum",
+                    ),
+                    color = scoreColor,
+                )
+            }
+            if (live) {
+                Spacer(Modifier.width(7.dp))
+                LiveDot(size = 9.dp)
+            }
         }
-        Text(
-            text = match.score ?: match.statusText.ifBlank { "—" },
-            style = MaterialTheme.typography.title3,
-            color = if (live) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface,
-        )
-        // Under the headline score: the current-set games in tennis, else the status/minute.
-        val caption = match.subScore ?: match.statusText.takeIf { it.isNotBlank() }
-        if (match.score != null && caption != null) {
+        // Under the score: the sets summary (tennis) or the live minute/status.
+        val caption = when {
+            hasScore && match.subScore != null -> "sets ${match.score}"
+            hasScore && match.statusText.isNotBlank() -> match.statusText
+            else -> null
+        }
+        if (caption != null) {
+            Spacer(Modifier.width(2.dp))
             Text(
                 text = caption,
                 style = MaterialTheme.typography.caption3,
@@ -237,27 +222,21 @@ private fun ScoreOrStatus(match: Match) {
     }
 }
 
-@Composable
-private fun CenteredProgress() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
-}
-
-@Composable
-private fun CenteredError(onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = stringResource(R.string.matches_load_error),
-                style = MaterialTheme.typography.body2,
-            )
-            Spacer(Modifier.height(8.dp))
-            Chip(
-                label = { Text(stringResource(R.string.refresh)) },
-                onClick = onRetry,
-                colors = ChipDefaults.primaryChipColors(),
-            )
+/**
+ * Builds "2₄ - 1₃": the set counts from [sets] ("2 - 1") at full size, each followed by its
+ * current-set games from [games] ("4-3") as a smaller, teal subscript. Falls back to plain
+ * [sets] text if either doesn't split into two sides.
+ */
+private fun tennisScore(sets: String, games: String, subColor: androidx.compose.ui.graphics.Color) =
+    buildAnnotatedString {
+        val s = sets.split(" - ")
+        val g = games.split("-")
+        if (s.size == 2 && g.size == 2) {
+            val sub = SpanStyle(baselineShift = BaselineShift.Subscript, fontSize = 0.55.em, color = subColor)
+            append(s[0]); withStyle(sub) { append(g[0].trim()) }
+            append(" - ")
+            append(s[1]); withStyle(sub) { append(g[1].trim()) }
+        } else {
+            append(sets)
         }
     }
-}

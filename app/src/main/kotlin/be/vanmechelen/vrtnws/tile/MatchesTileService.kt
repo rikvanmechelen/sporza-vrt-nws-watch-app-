@@ -4,12 +4,14 @@ import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.dp
 import androidx.wear.protolayout.DimensionBuilders.expand
+import androidx.wear.protolayout.DimensionBuilders.sp
 import androidx.wear.protolayout.LayoutElementBuilders
+import androidx.wear.protolayout.LayoutElementBuilders.FONT_WEIGHT_BOLD
+import androidx.wear.protolayout.LayoutElementBuilders.FONT_WEIGHT_MEDIUM
+import androidx.wear.protolayout.LayoutElementBuilders.FONT_WEIGHT_NORMAL
 import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
-import androidx.wear.protolayout.material.Text
-import androidx.wear.protolayout.material.Typography
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
@@ -27,9 +29,23 @@ import kotlinx.coroutines.guava.future
 import java.util.concurrent.TimeUnit
 
 private const val RES_VERSION = "1"
-private const val WHITE = 0xFFFFFFFF.toInt()
-private const val DIM = 0xFFB0B0B0.toInt()
-private const val YELLOW = 0xFFFFD200.toInt() // VRT yellow — the score accent
+
+// Redesign palette (mirrors the app's section colours; ProtoLayout uses the system font).
+private const val NAME = 0xFFE6E7EA.toInt() // team / player names
+private const val DIM = 0xFFA6AAB2.toInt() // meta, upcoming score
+private const val GREEN = 0xFF2FE07A.toInt() // Sporza — live score hero
+private const val TEAL = 0xFF8FE9BC.toInt() // section accent — header, games subscript, "+N meer"
+private const val CORAL = 0xFFFF5147.toInt() // live indicator dot
+private const val CARD = 0xFF111A16.toInt() // green-tinted scoreboard row background
+
+// Tile scale 0.75 — 0.75× the design-px sizes, to sit a touch smaller than the app's 1.0 screens
+// while staying consistent. (Design px × 0.75: score 24→18, name 16→12, labels 13→10, emoji 17→13.)
+private const val SZ_HEADER = 10f
+private const val SZ_NAME = 12f
+private const val SZ_SCORE = 18f
+private const val SZ_SUB = 10f
+private const val SZ_FOOTER = 10f
+private const val SZ_EMOJI = 13f
 
 /**
  * A Tile showing live Sporza match scores (up to 3, voetbal-first), or the next upcoming match
@@ -65,11 +81,7 @@ class MatchesTileService : TileService() {
     }
 
     private fun buildTile(model: MatchesTileModel): TileBuilders.Tile {
-        val root = if (model.rows.isEmpty()) {
-            emptyLayout()
-        } else {
-            contentLayout(model)
-        }
+        val root = if (model.rows.isEmpty()) emptyLayout() else contentLayout(model)
 
         val entry = TimelineBuilders.TimelineEntry.Builder()
             .setLayout(LayoutElementBuilders.Layout.Builder().setRoot(root).build())
@@ -103,7 +115,10 @@ class MatchesTileService : TileService() {
             .build()
         return ModifiersBuilders.Modifiers.Builder()
             .setClickable(clickable)
-            .setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(10f)).build())
+            .setPadding(
+                ModifiersBuilders.Padding.Builder()
+                    .setStart(dp(18f)).setEnd(dp(18f)).setTop(dp(8f)).setBottom(dp(8f)).build(),
+            )
             .build()
     }
 
@@ -114,13 +129,7 @@ class MatchesTileService : TileService() {
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(openMatchesModifiers())
-            .addContent(
-                Text.Builder(this, getString(R.string.tile_matches_empty))
-                    .setTypography(Typography.TYPOGRAPHY_BODY2)
-                    .setColor(argb(WHITE))
-                    .setMaxLines(2)
-                    .build(),
-            )
+            .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
             .build()
 
     private fun contentLayout(model: MatchesTileModel): LayoutElementBuilders.LayoutElement {
@@ -128,19 +137,20 @@ class MatchesTileService : TileService() {
             .setWidth(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
 
-        model.rows.forEach { column.addContent(matchRow(it, model.isLive)) }
-
-        val footer = when {
-            model.moreLiveCount > 0 -> getString(R.string.tile_matches_more, model.moreLiveCount)
-            else -> null
+        if (model.isLive) {
+            column.addContent(liveHeader())
+            column.addContent(vSpacer(12f))
         }
-        if (footer != null) {
+
+        model.rows.forEachIndexed { i, match ->
+            if (i > 0) column.addContent(vSpacer(8f))
+            column.addContent(matchRow(match, model.isLive))
+        }
+
+        if (model.moreLiveCount > 0) {
+            column.addContent(vSpacer(8f))
             column.addContent(
-                Text.Builder(this, footer)
-                    .setTypography(Typography.TYPOGRAPHY_CAPTION2)
-                    .setColor(argb(DIM))
-                    .setMaxLines(1)
-                    .build(),
+                text(getString(R.string.tile_matches_more, model.moreLiveCount), SZ_FOOTER, TEAL, FONT_WEIGHT_BOLD),
             )
         }
 
@@ -154,10 +164,19 @@ class MatchesTileService : TileService() {
             .build()
     }
 
+    /** "● Live nu" — a coral dot next to a teal, glanceable header. */
+    private fun liveHeader(): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Row.Builder()
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(dot(CORAL, 6f))
+            .addContent(spacer(6f))
+            .addContent(text(getString(R.string.tile_live_now), SZ_HEADER, TEAL, FONT_WEIGHT_BOLD))
+            .build()
+
     /**
-     * A structured scoreboard row: sport emoji · home (right-aligned) · the accented score/status ·
-     * away (left-aligned). Names ellipsize; the score is the visual hero (bold, VRT yellow when
-     * live). Sports without two sides (e.g. cycling) collapse to emoji · title · status.
+     * A structured scoreboard row inside a green-tinted rounded card: sport emoji · home
+     * (right-aligned) · the score (centre hero, green when live) · away (left-aligned). Names
+     * ellipsize; tennis names shorten to surnames so doubles never push the score off.
      */
     private fun matchRow(match: Match, isLive: Boolean): LayoutElementBuilders.LayoutElement {
         val row = LayoutElementBuilders.Row.Builder()
@@ -165,50 +184,48 @@ class MatchesTileService : TileService() {
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(argb(CARD))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(14f)).build())
+                            .build(),
+                    )
                     .setPadding(
                         ModifiersBuilders.Padding.Builder()
-                            .setTop(dp(3f)).setBottom(dp(3f)).build(),
+                            .setStart(dp(11f)).setEnd(dp(11f)).setTop(dp(8f)).setBottom(dp(8f))
+                            .build(),
                     )
                     .build(),
             )
 
-        row.addContent(
-            Text.Builder(this, sportEmoji(match.sportSlug))
-                .setTypography(Typography.TYPOGRAPHY_BODY2)
-                .setColor(argb(WHITE))
-                .setMaxLines(1)
-                .build(),
-        )
-        row.addContent(spacer(5f))
+        row.addContent(text(sportEmoji(match.sportSlug), SZ_EMOJI, NAME))
+        row.addContent(spacer(7f))
 
-        val score = scoreCell(matchMidText(match, isLive), match.subScore, if (isLive) YELLOW else WHITE)
+        val score = scoreCell(matchMidText(match, isLive), match.subScore, if (isLive) GREEN else DIM)
         if (match.home != null || match.away != null) {
-            row.addContent(nameCell(match.home.orEmpty(), LayoutElementBuilders.HORIZONTAL_ALIGN_END))
-            row.addContent(spacer(6f))
+            row.addContent(nameCell(displayName(match, match.home.orEmpty()), LayoutElementBuilders.HORIZONTAL_ALIGN_END))
+            row.addContent(spacer(7f))
             row.addContent(score)
-            row.addContent(spacer(6f))
-            row.addContent(nameCell(match.away.orEmpty(), LayoutElementBuilders.HORIZONTAL_ALIGN_START))
+            row.addContent(spacer(7f))
+            row.addContent(nameCell(displayName(match, match.away.orEmpty()), LayoutElementBuilders.HORIZONTAL_ALIGN_START))
         } else {
             row.addContent(nameCell(match.title, LayoutElementBuilders.HORIZONTAL_ALIGN_START))
-            row.addContent(spacer(6f))
+            row.addContent(spacer(7f))
             row.addContent(score)
         }
         return row.build()
     }
+
+    /** Tennis names shorten to a bare surname on the tile to survive doubles in a narrow row. */
+    private fun displayName(match: Match, name: String): String =
+        if (match.sportSlug == "tennis") abbreviatePlayerName(name, surnameOnly = true) else name
 
     /** An expanding, single-line, ellipsized team/player name aligned to one edge. */
     private fun nameCell(name: String, align: Int): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHorizontalAlignment(align)
-            .addContent(
-                Text.Builder(this, name)
-                    .setTypography(Typography.TYPOGRAPHY_BODY2)
-                    .setColor(argb(DIM))
-                    .setMaxLines(1)
-                    .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
-                    .build(),
-            )
+            .addContent(text(name, SZ_NAME, NAME, FONT_WEIGHT_MEDIUM, maxLines = 1, ellipsize = true))
             .build()
 
     /**
@@ -224,29 +241,69 @@ class MatchesTileService : TileService() {
             return LayoutElementBuilders.Row.Builder()
                 .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_BOTTOM)
                 .addContent(setCount(sets[0], color))
-                .addContent(gameSub(games[0]))
+                .addContent(gameSub(games[0].trim()))
                 .addContent(setCount("-", color))
                 .addContent(setCount(sets[1], color))
-                .addContent(gameSub(games[1]))
+                .addContent(gameSub(games[1].trim()))
                 .build()
         }
         return setCount(main, color)
     }
 
-    private fun setCount(text: String, color: Int): LayoutElementBuilders.LayoutElement =
-        Text.Builder(this, text)
-            .setTypography(Typography.TYPOGRAPHY_TITLE3)
-            .setColor(argb(color))
-            .setMaxLines(1)
-            .build()
+    private fun setCount(s: String, color: Int): LayoutElementBuilders.LayoutElement =
+        text(s, SZ_SCORE, color, FONT_WEIGHT_BOLD)
 
-    private fun gameSub(text: String): LayoutElementBuilders.LayoutElement =
-        Text.Builder(this, text)
-            .setTypography(Typography.TYPOGRAPHY_CAPTION2)
-            .setColor(argb(DIM))
-            .setMaxLines(1)
+    private fun gameSub(s: String): LayoutElementBuilders.LayoutElement =
+        text(s, SZ_SUB, TEAL, FONT_WEIGHT_BOLD)
+
+    /** Low-level text with an explicit size (the material Text presets don't go small enough). */
+    private fun text(
+        s: String,
+        sizeSp: Float,
+        color: Int,
+        weight: Int = FONT_WEIGHT_NORMAL,
+        maxLines: Int = 1,
+        ellipsize: Boolean = false,
+    ): LayoutElementBuilders.LayoutElement {
+        val fontStyle = LayoutElementBuilders.FontStyle.Builder()
+            .setSize(sp(sizeSp))
+            .setWeight(weight)
+            .setColor(argb(color))
+            .build()
+        val b = LayoutElementBuilders.Text.Builder()
+            .setText(s)
+            .setFontStyle(fontStyle)
+            .setMaxLines(maxLines)
+        if (ellipsize) {
+            b.setOverflow(
+                LayoutElementBuilders.TextOverflowProp.Builder()
+                    .setValue(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
+                    .build(),
+            )
+        }
+        return b.build()
+    }
+
+    /** A solid dot (used for the live indicator) — a fully-rounded coloured box. */
+    private fun dot(color: Int, size: Float): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Box.Builder()
+            .setWidth(dp(size))
+            .setHeight(dp(size))
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(argb(color))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(size / 2f)).build())
+                            .build(),
+                    )
+                    .build(),
+            )
             .build()
 
     private fun spacer(width: Float): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Spacer.Builder().setWidth(dp(width)).build()
+
+    private fun vSpacer(height: Float): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Spacer.Builder().setHeight(dp(height)).build()
 }

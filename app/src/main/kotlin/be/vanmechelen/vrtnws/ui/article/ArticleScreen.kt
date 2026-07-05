@@ -1,17 +1,23 @@
 package be.vanmechelen.vrtnws.ui.article
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,8 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
@@ -32,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import be.vanmechelen.vrtnws.R
 import be.vanmechelen.vrtnws.model.BlockType
 import be.vanmechelen.vrtnws.model.ContentBlock
+import be.vanmechelen.vrtnws.ui.components.HandoffButton
 
 @OptIn(androidx.wear.compose.foundation.ExperimentalWearFoundationApi::class)
 @Composable
@@ -48,42 +53,37 @@ fun ArticleScreen(
     ScalingLazyColumn(
         state = listState,
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .rotaryScrollable(RotaryScrollableDefaults.behavior(listState), focusRequester),
+        autoCentering = null,
         // Inset content so body text doesn't run into the round screen's curved edges.
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 32.dp),
+        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 40.dp, bottom = 44.dp),
     ) {
         item {
             Text(
                 text = title,
-                style = MaterialTheme.typography.title3,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.title1,
+                color = MaterialTheme.colors.onSurface,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
             )
         }
         when (val state = ui) {
             is ArticleUiState.Loading -> item { CenteredProgress() }
 
-            is ArticleUiState.Failed -> item {
-                FallbackNotice(R.string.article_load_error)
-            }
+            is ArticleUiState.Failed -> item { FallbackNotice() }
 
             is ArticleUiState.Ready -> {
                 if (state.content.isEmpty) {
-                    item { FallbackNotice(R.string.article_load_error) }
+                    item { FallbackNotice() }
                 } else {
-                    items(state.content.blocks.size) { i ->
-                        BlockText(state.content.blocks[i])
-                    }
+                    items(state.content.blocks) { block -> BlockText(block) }
                 }
             }
         }
         item {
-            Spacer(Modifier.height(4.dp))
-            Chip(
-                label = { Text(stringResource(R.string.open_on_phone)) },
+            Spacer(Modifier.height(10.dp))
+            HandoffButton(
                 onClick = { onOpenOnPhone(viewModel.articleUrl) },
-                colors = ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -95,29 +95,41 @@ private fun BlockText(block: ContentBlock) {
     when (block.type) {
         BlockType.HEADING -> Text(
             text = block.text,
-            style = MaterialTheme.typography.title3,
+            style = MaterialTheme.typography.title2,
             color = MaterialTheme.colors.primary,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
         )
-        BlockType.QUOTE -> Text(
-            text = block.text,
-            style = MaterialTheme.typography.body2.copy(fontStyle = FontStyle.Italic),
-            color = MaterialTheme.colors.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = 4.dp),
-        )
+        BlockType.QUOTE -> Row(
+            Modifier.height(IntrinsicSize.Min).padding(vertical = 8.dp),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .width(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colors.primary),
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = block.text,
+                style = MaterialTheme.typography.body1.copy(fontStyle = FontStyle.Italic),
+                color = MaterialTheme.colors.onSurface,
+            )
+        }
         BlockType.PARAGRAPH -> Text(
             text = block.text,
-            style = MaterialTheme.typography.body2,
-            modifier = Modifier.padding(vertical = 2.dp),
+            style = MaterialTheme.typography.body1,
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.88f),
+            modifier = Modifier.padding(vertical = 5.dp),
         )
     }
 }
 
 @Composable
-private fun FallbackNotice(messageRes: Int) {
+private fun FallbackNotice() {
     Text(
-        text = stringResource(messageRes),
-        style = MaterialTheme.typography.body2,
+        text = stringResource(R.string.article_load_error),
+        style = MaterialTheme.typography.body1,
         color = MaterialTheme.colors.onSurfaceVariant,
         modifier = Modifier.padding(vertical = 8.dp),
     )
@@ -126,6 +138,6 @@ private fun FallbackNotice(messageRes: Int) {
 @Composable
 private fun CenteredProgress() {
     Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        CircularProgressIndicator(indicatorColor = MaterialTheme.colors.primary)
     }
 }

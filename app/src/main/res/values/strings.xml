@@ -8,6 +8,8 @@
     <string name="source_top">Kort</string>
     <string name="source_sport">Sport</string>
     <string name="refresh">Vernieuwen</string>
+    <string name="retry">Opnieuw</string>
+    <string name="offline_pill">Offline</string>
     <string name="loading">Laden…</string>
     <string name="empty_headlines">Geen nieuws. Trek naar beneden om te vernieuwen.</string>
     <string name="offline">Offline — laatst bewaarde nieuws</string>
@@ -15,12 +17,16 @@
     <string name="article_load_error">Kon artikel niet laden</string>
     <string name="open_on_phone">Open op telefoon</string>
     <string name="tile_latest">Laatste nieuws</string>
+    <string name="complication_short_label">NWS</string>
+    <string name="tile_tap_to_open">Tik om te openen</string>
     <string name="tile_matches">Live scores</string>
+    <string name="tile_live_now">Live nu</string>
     <string name="tile_matches_empty">Geen live wedstrijden</string>
     <string name="tile_matches_more">+%d meer →</string>
     <string name="source_matches">Matches</string>
     <string name="matches_load_error">Kon wedstrijden niet laden</string>
-    <string name="matches_empty">Geen wedstrijden</string>
+    <string name="matches_empty">Geen matches vandaag</string>
+    <string name="matches_empty_sub">Kom straks terug voor de volgende wedstrijden.</string>
     <string name="match_load_error">Kon wedstrijd niet laden</string>
     <string name="match_events">Belangrijke fases</string>
     <string name="match_stream">Fase per fase</string>
