@@ -17,12 +17,12 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "be.vanmechelen.vrtnws"
+    namespace = "me.vanmechelen.vrtsporza"
     compileSdk = 36
     buildToolsVersion = "36.1.0"
 
     defaultConfig {
-        applicationId = "be.vanmechelen.vrtnws"
+        applicationId = "me.vanmechelen.vrtsporza"
         minSdk = 33
         targetSdk = 36
         versionCode = 1

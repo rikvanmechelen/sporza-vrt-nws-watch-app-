@@ -45,7 +45,7 @@ present — it names `storeFile=upload-keystore.jks` (also gitignored) + passwor
 another machine) release falls back to the **debug** key so it still builds for sideload. **Back up
 `upload-keystore.jks` + its password off-machine** — losing it means asking Google to reset the
 upload key. Caveat: an upload-key-signed release can't install *over* a debug-signed build of the
-same package (signature mismatch) — `adb uninstall be.vanmechelen.vrtnws` first. Google Play App
+same package (signature mismatch) — `adb uninstall me.vanmechelen.vrtsporza` first. Google Play App
 Signing holds the real distribution key; this key only signs uploads.
 
 ### Devices
@@ -62,7 +62,7 @@ adb -s emulator-5554 exec-out screencap -p > shot.png   # 480x480 round frame
 ```
 
 - Launch a specific screen first: `adb -s emulator-5554 shell am start \
-    -n be.vanmechelen.vrtnws/.ui.MainActivity --es tab matches` (extra opens the Matches
+    -n me.vanmechelen.vrtsporza/.ui.MainActivity --es tab matches` (extra opens the Matches
   tab; omit for tab 0). Deep-link only applies on a **cold** start — `force-stop` first,
   since `MainActivity` reads the extra in `onCreate` (no `onNewIntent`).
 - Navigate with `adb shell input swipe <x1> <y1> <x2> <y2> <ms>` (page swipes) and
