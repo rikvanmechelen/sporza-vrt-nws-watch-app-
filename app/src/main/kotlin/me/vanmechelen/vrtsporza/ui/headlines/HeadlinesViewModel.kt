@@ -17,6 +17,8 @@ data class HeadlinesUiState(
     val isRefreshing: Boolean = false,
     /** True when the most recent refresh failed (e.g. offline). */
     val loadFailed: Boolean = false,
+    /** When this source was last successfully synced (epoch ms); null until the first sync. */
+    val lastSyncedEpochMs: Long? = null,
 ) {
     val isInitialLoading: Boolean get() = isRefreshing && articles.isEmpty()
     val showOfflineBanner: Boolean get() = loadFailed && articles.isNotEmpty()
@@ -32,8 +34,18 @@ class HeadlinesViewModel(
     private val loadFailed = MutableStateFlow(false)
 
     val uiState: StateFlow<HeadlinesUiState> =
-        combine(repository.headlines(source), isRefreshing, loadFailed) { articles, refreshing, failed ->
-            HeadlinesUiState(articles = articles, isRefreshing = refreshing, loadFailed = failed)
+        combine(
+            repository.headlines(source),
+            isRefreshing,
+            loadFailed,
+            repository.lastSyncedAt(source),
+        ) { articles, refreshing, failed, syncedAt ->
+            HeadlinesUiState(
+                articles = articles,
+                isRefreshing = refreshing,
+                loadFailed = failed,
+                lastSyncedEpochMs = syncedAt,
+            )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

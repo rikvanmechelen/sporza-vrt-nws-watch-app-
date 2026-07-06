@@ -26,12 +26,21 @@ interface ArticleCache {
     suspend fun cachedBody(url: String): ArticleContent?
     suspend fun saveBody(url: String, content: ArticleContent)
     suspend fun latestHeadline(source: NewsSource): Article?
+
+    /** Emits when [source] was last successfully synced (epoch ms), or null until first sync. */
+    fun observeSyncedAt(source: NewsSource): Flow<Long?>
+
+    /** Records that [source] was successfully synced at [epochMs]. */
+    suspend fun recordSyncedAt(source: NewsSource, epochMs: Long)
 }
 
 /** Single source of truth for the UI: cache-first per-source headlines and article bodies. */
 interface NewsRepository {
     /** Emits cached headlines for [source], newest first; updates when the cache changes. */
     fun headlines(source: NewsSource): Flow<List<Article>>
+
+    /** Emits when [source] was last successfully refreshed (epoch ms), or null until first sync. */
+    fun lastSyncedAt(source: NewsSource): Flow<Long?>
 
     /** Fetches fresh headlines for [source] and stores them. Cache is preserved on failure. */
     suspend fun refresh(source: NewsSource): Result<Unit>

@@ -5,7 +5,9 @@ import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders.dp
 import androidx.wear.protolayout.DimensionBuilders.expand
+import androidx.wear.protolayout.DimensionBuilders.sp
 import androidx.wear.protolayout.LayoutElementBuilders
+import androidx.wear.protolayout.LayoutElementBuilders.FONT_WEIGHT_NORMAL
 import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
@@ -16,12 +18,15 @@ import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import me.vanmechelen.vrtsporza.R
 import me.vanmechelen.vrtsporza.VrtNwsApp
+import me.vanmechelen.vrtsporza.freshness.syncedClock
+import me.vanmechelen.vrtsporza.model.NewsSource
 import me.vanmechelen.vrtsporza.ui.MainActivity
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import java.util.concurrent.TimeUnit
 
@@ -33,6 +38,10 @@ private const val VIOLET = 0xFF302070.toInt() // badge fill
 private const val BADGE_TEXT = 0xFFC7C0FF.toInt()
 private const val HEADLINE = 0xFFFFFFFF.toInt()
 private const val META = 0xFFA6AAB2.toInt()
+
+// Freshness marker: news-lavender dot at 55% + a dim neutral label (mirrors the app's #6E7078).
+private const val SYNC_DOT = 0x8CA99CFF.toInt() // lavender @ 55% alpha
+private const val SYNC_LABEL = 0xFF6E7078.toInt()
 
 /** A Tile showing the latest cached headline; tapping opens the app. */
 class LatestHeadlineTileService : TileService() {
@@ -47,14 +56,19 @@ class LatestHeadlineTileService : TileService() {
     override fun onTileRequest(
         requestParams: RequestBuilders.TileRequest,
     ): ListenableFuture<TileBuilders.Tile> = scope.future {
-        val headline = runCatching { VrtNwsApp.instance.graph.repository.latestHeadline() }.getOrNull()
+        val repo = VrtNwsApp.instance.graph.repository
+        val headline = runCatching { repo.latestHeadline() }.getOrNull()
         val title = headline?.title ?: getString(R.string.empty_headlines)
         // Meta line mirrors the design: "1 uur geleden · tik om te openen" (age from the article).
         val meta = headline?.let {
             val age = DateUtils.getRelativeTimeSpanString(it.publishedEpochMs).toString()
             "$age · ${getString(R.string.tile_tap_to_open)}"
         }
-        buildTile(title, meta)
+        // Freshness = when the NEWS feed was last synced (persisted in Room). Shown as an absolute
+        // clock time, not a relative "X geleden": a tile is a frozen snapshot (re-renders only every
+        // ~30 min), so a relative string would go stale and lie — "om 14:23" stays correct.
+        val syncedAt = runCatching { repo.lastSyncedAt(NewsSource.NEWS_LATEST).first() }.getOrNull()
+        buildTile(title, meta, syncedAt)
     }
 
     override fun onTileResourcesRequest(
@@ -63,7 +77,7 @@ class LatestHeadlineTileService : TileService() {
         ResourceBuilders.Resources.Builder().setVersion(RES_VERSION).build()
     }
 
-    private fun buildTile(title: String, meta: String?): TileBuilders.Tile {
+    private fun buildTile(title: String, meta: String?, syncedAtEpochMs: Long?): TileBuilders.Tile {
         val launch = ModifiersBuilders.Clickable.Builder()
             .setId("open")
             .setOnClick(
@@ -100,6 +114,12 @@ class LatestHeadlineTileService : TileService() {
                     .setMaxLines(1)
                     .build(),
             )
+        }
+
+        // Freshness marker sits below the tap-hint (only once we have a real last-synced time).
+        if (syncedAtEpochMs != null) {
+            content.addContent(spacer(10f))
+            content.addContent(freshnessRow(syncedAtEpochMs))
         }
 
         val root = LayoutElementBuilders.Box.Builder()
@@ -169,4 +189,47 @@ class LatestHeadlineTileService : TileService() {
 
     private fun spacer(height: Float): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Spacer.Builder().setHeight(dp(height)).build()
+
+    /** "● bijgewerkt om 14:23" — a lavender dot + a dim absolute-time label. */
+    private fun freshnessRow(syncedAtEpochMs: Long): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Row.Builder()
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(dot(SYNC_DOT, 5f))
+            .addContent(hSpacer(6f))
+            .addContent(
+                syncedText(getString(R.string.freshness_updated_at, syncedClock(syncedAtEpochMs))),
+            )
+            .build()
+
+    private fun syncedText(s: String): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Text.Builder()
+            .setText(s)
+            .setMaxLines(1)
+            .setFontStyle(
+                LayoutElementBuilders.FontStyle.Builder()
+                    .setSize(sp(10f))
+                    .setWeight(FONT_WEIGHT_NORMAL)
+                    .setColor(argb(SYNC_LABEL))
+                    .build(),
+            )
+            .build()
+
+    private fun dot(color: Int, size: Float): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Box.Builder()
+            .setWidth(dp(size))
+            .setHeight(dp(size))
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(argb(color))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(size / 2f)).build())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build()
+
+    private fun hSpacer(width: Float): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Spacer.Builder().setWidth(dp(width)).build()
 }

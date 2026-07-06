@@ -8,6 +8,7 @@ import me.vanmechelen.vrtsporza.model.MatchStatus
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -71,5 +72,19 @@ class MatchesRepositoryTest {
     fun detailPropagatesFailure() = runTest {
         service.onDetail = { throw java.io.IOException("no net") }
         assertTrue(repo.detail("https://x/a").isFailure)
+    }
+
+    @Test
+    fun refreshStampsLastSyncedTimeOnSuccessOnly() = runTest {
+        var clock = 42L
+        val stamped = DefaultMatchesRepository(service, now = { clock })
+        assertNull(stamped.lastSyncedAt().first()) // nothing synced yet
+        service.calendar = { listOf(match("a")) }
+        stamped.refresh()
+        assertEquals(42L, stamped.lastSyncedAt().first())
+        clock = 99L
+        service.calendar = { throw java.io.IOException("offline") }
+        stamped.refresh()
+        assertEquals("failed refresh keeps the last good sync time", 42L, stamped.lastSyncedAt().first())
     }
 }

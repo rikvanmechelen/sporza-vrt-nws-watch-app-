@@ -54,8 +54,10 @@ import me.vanmechelen.vrtsporza.model.MatchEvent
 import me.vanmechelen.vrtsporza.model.MatchEventType
 import me.vanmechelen.vrtsporza.model.MatchStatus
 import me.vanmechelen.vrtsporza.model.StreamItem
+import me.vanmechelen.vrtsporza.tile.localizeKickoffTime
 import me.vanmechelen.vrtsporza.tile.sportEmoji
 import me.vanmechelen.vrtsporza.ui.components.CardColor
+import me.vanmechelen.vrtsporza.ui.components.FreshnessMarker
 import me.vanmechelen.vrtsporza.ui.components.HandoffButton
 import me.vanmechelen.vrtsporza.ui.components.LivePill
 
@@ -118,7 +120,13 @@ fun MatchDetailScreen(
                 .verticalScroll(scrollState)
                 .rotaryScrollable(RotaryScrollableDefaults.behavior(scrollState), focusRequester),
         ) {
-            MatchLeadHeader(match = match, height = leadHeight)
+            // The freshness marker reflects when this detail was fetched (Ready.syncedAtEpochMs);
+            // it's absent until the fetch lands, so the hero shows no time while loading.
+            MatchLeadHeader(
+                match = match,
+                height = leadHeight,
+                syncedAtEpochMs = (ui as? MatchDetailUiState.Ready)?.syncedAtEpochMs,
+            )
             Spacer(Modifier.height(6.dp))
 
             when (val state = ui) {
@@ -164,7 +172,7 @@ private fun MatchSections(detail: MatchDetail) {
  * under a scrim, with the competition kicker + scoreboard riding the lower part and flowing down.
  */
 @Composable
-private fun MatchLeadHeader(match: Match, height: Dp) {
+private fun MatchLeadHeader(match: Match, height: Dp, syncedAtEpochMs: Long?) {
     val live = match.status == MatchStatus.LIVE
     val accent = MaterialTheme.colors.secondary
     Box(Modifier.fillMaxWidth()) {
@@ -227,7 +235,10 @@ private fun MatchLeadHeader(match: Match, height: Dp) {
                 )
             }
             Text(
-                text = match.score ?: match.statusText.ifBlank { "—" },
+                // Kickoff (upcoming, no score) is Sporza's Brussels wall-clock — localize to the
+                // watch's zone at the display boundary, mirroring MatchesScreen.ScoreOrStatus. A
+                // no-op on scores / live phases (no HH:mm token).
+                text = match.score ?: localizeKickoffTime(match.statusText).ifBlank { "—" },
                 style = MaterialTheme.typography.display1.copy(shadow = titleShadow),
                 color = if (live) MaterialTheme.colors.primary else Color.White,
                 modifier = Modifier.padding(vertical = 2.dp),
@@ -258,6 +269,12 @@ private fun MatchLeadHeader(match: Match, height: Dp) {
                     color = Color.White.copy(alpha = 0.85f),
                 )
             }
+            // Freshness marker below the scoreboard/pill (green dot — this screen is SPORT-themed).
+            FreshnessMarker(
+                syncedAtEpochMs = syncedAtEpochMs,
+                isRefreshing = false,
+                modifier = Modifier.padding(top = 10.dp),
+            )
         }
     }
 }

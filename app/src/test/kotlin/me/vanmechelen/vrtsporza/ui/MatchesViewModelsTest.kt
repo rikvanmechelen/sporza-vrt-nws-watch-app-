@@ -29,9 +29,11 @@ private fun match(id: String) = Match(
 
 private class FakeMatchesRepo : MatchesRepository {
     val flow = MutableStateFlow<List<Match>>(emptyList())
+    val syncedAt = MutableStateFlow<Long?>(null)
     var refreshResult: Result<Unit> = Result.success(Unit)
     var detailResult: Result<MatchDetail> = Result.success(MatchDetail(emptyList(), emptyList(), emptyList()))
     override fun matches(): Flow<List<Match>> = flow
+    override fun lastSyncedAt(): Flow<Long?> = syncedAt
     override suspend fun refresh(): Result<Unit> = refreshResult
     override suspend fun detail(url: String): Result<MatchDetail> = detailResult
 }
@@ -52,6 +54,18 @@ class MatchesViewModelsTest {
             assertEquals(2, state.matches.size)
             assertFalse(state.isRefreshing)
             assertFalse(state.loadFailed)
+        }
+    }
+
+    @Test
+    fun exposesLastSyncedTimeFromRepository() = runTest {
+        val repo = FakeMatchesRepo()
+        val vm = MatchesViewModel(repo)
+        vm.uiState.test {
+            awaitItem()
+            repo.syncedAt.value = 321L
+            advanceUntilIdle()
+            assertEquals(321L, expectMostRecentItem().lastSyncedEpochMs)
         }
     }
 
@@ -78,12 +92,13 @@ class MatchesViewModelsTest {
                 MatchDetail(emptyList(), emptyList(), listOf(ContentBlock(BlockType.PARAGRAPH, "hi"))),
             )
         }
-        val vm = MatchDetailViewModel(repo, "https://x/a")
+        val vm = MatchDetailViewModel(repo, "https://x/a", now = { 555L })
         vm.uiState.test {
             advanceUntilIdle()
             val state = expectMostRecentItem()
             assertTrue(state is MatchDetailUiState.Ready)
             assertEquals("hi", (state as MatchDetailUiState.Ready).detail.recap.first().text)
+            assertEquals("detail carries its load time for the freshness marker", 555L, state.syncedAtEpochMs)
         }
     }
 

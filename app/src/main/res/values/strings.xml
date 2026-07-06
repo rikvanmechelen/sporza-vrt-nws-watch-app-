@@ -29,6 +29,9 @@
     <string name="matches_empty">Geen matches vandaag</string>
     <string name="matches_empty_sub">Kom straks terug voor de volgende wedstrijden.</string>
     <string name="match_load_error">Kon wedstrijd niet laden</string>
+    <string name="freshness_updated">bijgewerkt %1$s</string>
+    <string name="freshness_updating">bijwerken…</string>
+    <string name="freshness_updated_at">bijgewerkt om %1$s</string>
     <string name="match_events">Belangrijke fases</string>
     <string name="match_stream">Fase per fase</string>
     <string name="match_recap">Verslag</string>

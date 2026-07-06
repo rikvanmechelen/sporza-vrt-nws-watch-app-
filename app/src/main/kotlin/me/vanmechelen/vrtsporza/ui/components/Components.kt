@@ -24,7 +24,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,14 +39,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import kotlinx.coroutines.delay
 import me.vanmechelen.vrtsporza.R
+import me.vanmechelen.vrtsporza.freshness.relativeAge
 import me.vanmechelen.vrtsporza.ui.theme.VrtAccents
 
 /** Card background base (all list cards); the top/accent card tints this with the section accent. */
@@ -53,40 +62,110 @@ val CardRadius = 26.dp
 
 /**
  * The tappable section header: an accent-tinted [display3] label with the refresh affordance
- * built in (a glyph that swaps to an inline spinner while refreshing). Reused by every list
- * screen so page identity + refresh read the same everywhere.
+ * built in (a glyph that swaps to an inline spinner while refreshing), and — directly under it —
+ * the data-freshness marker. Reused by every list screen so page identity + refresh + freshness
+ * read the same everywhere. Only the title row is tappable; the marker is display-only.
  */
 @Composable
-fun SectionHeader(title: String, isRefreshing: Boolean, onRefresh: () -> Unit) {
+fun SectionHeader(
+    title: String,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    syncedAtEpochMs: Long? = null,
+) {
     val refreshLabel = stringResource(R.string.refresh)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onRefresh)
+                .semantics { contentDescription = refreshLabel },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.display3,
+                color = MaterialTheme.colors.primary,
+            )
+            Spacer(Modifier.width(8.dp))
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    indicatorColor = MaterialTheme.colors.primary,
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.ic_refresh),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colors.primary,
+                )
+            }
+        }
+        FreshnessMarker(
+            syncedAtEpochMs = syncedAtEpochMs,
+            isRefreshing = isRefreshing,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
+}
+
+/**
+ * The "data freshness" marker (Freshness Indicator handoff): a small centered row — a section-accent
+ * dot at 55% opacity + a dim monospace "bijgewerkt <relative time>" label. While [isRefreshing] it
+ * reads "bijwerken…"; otherwise it ages in place on a ~20s ticker so the relative time stays correct
+ * without a new fetch (the screen recomputes it client-side). Renders nothing until there's an
+ * honest value to show — never-synced and not-refreshing → absent (so we never claim a false time).
+ */
+@Composable
+fun FreshnessMarker(
+    syncedAtEpochMs: Long?,
+    isRefreshing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (!isRefreshing && syncedAtEpochMs == null) return
+
+    val label = if (isRefreshing) {
+        stringResource(R.string.freshness_updating)
+    } else {
+        // Re-render the relative age every 20s while visible; on resume/recompose it recomputes
+        // from `now`, so a backgrounded screen self-corrects rather than showing a frozen age.
+        var now by remember { mutableStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(20_000)
+            }
+        }
+        stringResource(R.string.freshness_updated, relativeAge(syncedAtEpochMs!!, now))
+    }
+
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onRefresh)
-            .semantics { contentDescription = refreshLabel },
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.display3,
-            color = MaterialTheme.colors.primary,
+        Box(
+            Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colors.primary.copy(alpha = 0.55f)),
         )
-        Spacer(Modifier.width(8.dp))
-        if (isRefreshing) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
-                indicatorColor = MaterialTheme.colors.primary,
-            )
-        } else {
-            Icon(
-                painter = painterResource(R.drawable.ic_refresh),
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colors.primary,
-            )
-        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.caption1.copy(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp,
+                letterSpacing = 0.04.em,
+            ),
+            color = VrtAccents.FreshnessLabel,
+        )
     }
 }
 

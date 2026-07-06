@@ -78,10 +78,12 @@ data/
   remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services,
           MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores),
           ScheduleParser (regex over the schedule API JSON: real kickoff/status/score per fixture)
-  local/  Room: ArticleEntity (PK id+source) + ArticleBodyEntity (PK url) + BlockConverters,
-          ArticleDao, NewsDatabase (v2), RoomArticleCache
+  local/  Room: ArticleEntity (PK id+source) + ArticleBodyEntity (PK url) + SyncStateEntity
+          (PK source: per-source last-synced time) + BlockConverters, ArticleDao,
+          NewsDatabase (v3), RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
   MatchesRepository.kt (MatchesService + MatchesRepository + in-memory DefaultMatchesRepository)
+freshness/ FreshnessFormat.kt (pure, Android-free: relativeAge for screens, syncedClock for tiles)
 model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsSource,
           Match / MatchDetail (MatchEvent, StreamItem) + MatchSports
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox
@@ -189,6 +191,22 @@ AppGraph.kt (manual DI), VrtNwsApp.kt (Application)
   `livestream-` cards only: promotes status **forward only** (upcoming→live→finished — never regress a
   live card to upcoming on a stale row), fills in the score, and replaces the broadcast time with the
   real kickoff while still upcoming. Scoreboard matches (numeric ids) are left untouched.
+- **Freshness marker: relative on screens, absolute on tiles — and that split is the whole point.**
+  A "bijgewerkt …" marker shows how fresh the on-screen data is (`FreshnessMarker` in
+  `Components.kt`, under `SectionHeader` on every list screen + in the match-detail hero below the
+  scoreboard). **Screens** re-render `relativeAge()` ("zonet / N s / N min / N u / N d geleden") on a
+  20s `LaunchedEffect` ticker, so it ages correctly while visible without a refetch, and reads
+  `"bijwerken…"` while `isRefreshing`. **Tiles are a frozen ProtoLayout snapshot** (re-render only on
+  their freshness interval — 30 min headline, 1 min matches), so a relative string would go stale and
+  *lie*; they instead show `syncedClock()` — an absolute `"bijgewerkt om 14:23"` that is correct
+  forever regardless of when glanced. Both formatters are pure/unit-tested in
+  `freshness/FreshnessFormat.kt`. Source of truth for "last synced" is **success-only**: news
+  persists it per-source in Room (`sync_state`, so it's honest even offline across restarts), matches
+  keeps it in-memory (like the calendar), match-detail uses its fetch time. A failed refresh never
+  updates it, and it's **null until the first successful sync → marker hidden** (never claim a time we
+  can't back up). Dot = section accent @55% (lavender news / green sport); label = dim `#6E7078`
+  (`VrtAccents.FreshnessLabel`) — quieter than per-item timestamps so it never competes. Don't
+  "simplify" the tile marker to a relative string — that reintroduces the staleness bug.
 - **Match times are Europe/Brussels wall-clock; display converts to the watch's zone.** Sporza
   (Belgian) renders every kickoff in CET/CEST as a bare `HH:mm` string, stored verbatim in
   `Match.statusText`. Conversion happens at the **display boundary** (parsing stays "what Sporza
@@ -243,5 +261,5 @@ suppressed in `gradle.properties`) · minSdk 33.
   has `-dontwarn`) + on-device testing. Parked.
 - **Matches auto-polling**: v1 is tap-to-refresh. The scoreboard JSON API + its `interval`
   would drive live updates (and a live score in the detail header). Parked.
-- **Matches offline caching**: currently in-memory only. A `MatchEntity`/detail table (DB v3,
+- **Matches offline caching**: currently in-memory only. A `MatchEntity`/detail table (DB v4,
   destructive migration) would make the section open offline like news. Parked.

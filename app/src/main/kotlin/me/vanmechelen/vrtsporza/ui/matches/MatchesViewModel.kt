@@ -16,6 +16,8 @@ data class MatchesUiState(
     val isRefreshing: Boolean = false,
     /** True when the most recent refresh failed (e.g. offline). */
     val loadFailed: Boolean = false,
+    /** When the calendar was last successfully synced (epoch ms); null until the first sync. */
+    val lastSyncedEpochMs: Long? = null,
 ) {
     val isInitialLoading: Boolean get() = isRefreshing && matches.isEmpty()
     val showOfflineBanner: Boolean get() = loadFailed && matches.isNotEmpty()
@@ -31,8 +33,18 @@ class MatchesViewModel(
     private val loadFailed = MutableStateFlow(false)
 
     val uiState: StateFlow<MatchesUiState> =
-        combine(repository.matches(), isRefreshing, loadFailed) { matches, refreshing, failed ->
-            MatchesUiState(matches = matches, isRefreshing = refreshing, loadFailed = failed)
+        combine(
+            repository.matches(),
+            isRefreshing,
+            loadFailed,
+            repository.lastSyncedAt(),
+        ) { matches, refreshing, failed, syncedAt ->
+            MatchesUiState(
+                matches = matches,
+                isRefreshing = refreshing,
+                loadFailed = failed,
+                lastSyncedEpochMs = syncedAt,
+            )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

@@ -24,6 +24,11 @@ Live scores come from the Sporza calendar (`https://sporza.be/nl/kalender`, scra
   (they are ephemeral) and refreshed on demand.
 - **Tap the section title** to force-refresh that page. Swipe from the left edge returns from
   an article or match detail to the list.
+- **Data-freshness marker** — a subtle "bijgewerkt …" line under each section title (and in the
+  match-detail hero) shows how fresh the on-screen data is. On screens it's a live relative time
+  ("bijgewerkt 2 min geleden", "bijwerken…" while refreshing) that ages in place; on the Tiles it's
+  an absolute clock time ("bijgewerkt om 14:23") since a tile snapshot can't tick without going
+  stale. It appears only after a successful sync, so it never shows a time it can't stand behind.
 - Two **Tiles** — a *latest headline* glance and a *live scores* glance — plus a
   **complication** showing the latest headline. The live-scores tile is a scoreboard of up to
   3 live matches (football first): a sport emoji, home/away, and the score as the accented hero;
@@ -41,10 +46,11 @@ data/
   remote/ AtomFeedParser (Jsoup XML), ArticleExtractor (Jsoup DOM), OkHttp services,
           MatchCalendarParser + MatchDetailExtractor (Jsoup, Sporza scores),
           ScheduleParser (real kickoff times from the schedule API)
-  local/  Room: ArticleEntity (id+source) + ArticleBodyEntity (url) + BlockConverters,
-          ArticleDao, NewsDatabase, RoomArticleCache
+  local/  Room: ArticleEntity (id+source) + ArticleBodyEntity (url) + SyncStateEntity
+          (per-source last-synced time) + BlockConverters, ArticleDao, NewsDatabase, RoomArticleCache
   NewsContracts.kt (FeedService/ArticleService/ArticleCache/NewsRepository), DefaultNewsRepository
   MatchesRepository.kt (MatchesService + MatchesRepository + in-memory DefaultMatchesRepository)
+freshness/ FreshnessFormat.kt (pure: relativeAge for screens, syncedClock for tiles)
 model/    Article, ArticleContent (ContentBlock: HEADING/PARAGRAPH/QUOTE), NewsSource (feeds),
           Match / MatchDetail (MatchEvent, StreamItem) + MatchSports
 ui/       MainActivity, AppRoot (HorizontalPager over a PagerTab list + SwipeToDismissBox

@@ -48,4 +48,11 @@ abstract class ArticleDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun upsertBody(body: ArticleBodyEntity)
+
+    /** Emits the last-synced time for [source], or null until it has been synced at least once. */
+    @Query("SELECT lastSyncedEpochMs FROM sync_state WHERE source = :source LIMIT 1")
+    abstract fun observeSyncedAt(source: String): Flow<Long?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun upsertSyncState(row: SyncStateEntity)
 }

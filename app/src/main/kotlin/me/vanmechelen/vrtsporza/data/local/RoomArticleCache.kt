@@ -24,6 +24,12 @@ class RoomArticleCache(private val dao: ArticleDao) : ArticleCache {
 
     override suspend fun latestHeadline(source: NewsSource): Article? =
         dao.latestForSource(source.name)?.toArticle()
+
+    override fun observeSyncedAt(source: NewsSource): Flow<Long?> =
+        dao.observeSyncedAt(source.name)
+
+    override suspend fun recordSyncedAt(source: NewsSource, epochMs: Long) =
+        dao.upsertSyncState(SyncStateEntity(source.name, epochMs))
 }
 
 private fun ArticleEntity.toArticle() = Article(

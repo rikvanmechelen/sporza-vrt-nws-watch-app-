@@ -22,6 +22,12 @@ interface MatchesRepository {
     /** Emits the cached calendar (grouped voetbal-first); updates on [refresh]. */
     fun matches(): Flow<List<Match>>
 
+    /**
+     * Emits when the calendar was last successfully refreshed (epoch ms), or null until first
+     * sync. In-memory (scores are ephemeral), so it resets on process death like the calendar.
+     */
+    fun lastSyncedAt(): Flow<Long?>
+
     /** Fetches a fresh calendar and publishes it. The last good calendar is kept on failure. */
     suspend fun refresh(): Result<Unit>
 
@@ -31,16 +37,21 @@ interface MatchesRepository {
 
 class DefaultMatchesRepository(
     private val service: MatchesService,
+    private val now: () -> Long = { System.currentTimeMillis() },
 ) : MatchesRepository {
 
     private val calendar = MutableStateFlow<List<Match>>(emptyList())
+    private val lastSynced = MutableStateFlow<Long?>(null)
     private val detailCache = ConcurrentHashMap<String, MatchDetail>()
 
     override fun matches(): Flow<List<Match>> = calendar.asStateFlow()
 
+    override fun lastSyncedAt(): Flow<Long?> = lastSynced.asStateFlow()
+
     override suspend fun refresh(): Result<Unit> = runCatching {
         // runCatching leaves `calendar` untouched if the fetch throws → last good is preserved.
         calendar.value = service.fetchCalendar()
+        lastSynced.value = now()
     }
 
     override suspend fun detail(url: String): Result<MatchDetail> = runCatching {

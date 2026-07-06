@@ -31,8 +31,10 @@ class HeadlinesHeaderRefreshTest {
                 Article("a", "een kop", "", "https://x/a", null, 0L, null),
             ),
         )
+        val syncedAt = MutableStateFlow<Long?>(null)
         var refreshCount = 0
         override fun headlines(source: NewsSource): Flow<List<Article>> = items
+        override fun lastSyncedAt(source: NewsSource): Flow<Long?> = syncedAt
         override suspend fun refresh(source: NewsSource): Result<Unit> {
             refreshCount++
             return Result.success(Unit)

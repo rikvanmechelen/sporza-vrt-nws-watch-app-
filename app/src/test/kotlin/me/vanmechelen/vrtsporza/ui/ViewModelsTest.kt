@@ -26,9 +26,11 @@ private fun article(id: String) =
 
 private class FakeRepo : NewsRepository {
     val flow = MutableStateFlow<List<Article>>(emptyList())
+    val syncedAt = MutableStateFlow<Long?>(null)
     var refreshResult: Result<Unit> = Result.success(Unit)
     var bodyResult: Result<ArticleContent> = Result.success(ArticleContent(emptyList()))
     override fun headlines(source: NewsSource): Flow<List<Article>> = flow
+    override fun lastSyncedAt(source: NewsSource): Flow<Long?> = syncedAt
     override suspend fun refresh(source: NewsSource): Result<Unit> = refreshResult
     override suspend fun body(url: String): Result<ArticleContent> = bodyResult
     override suspend fun latestHeadline(): Article? = flow.value.firstOrNull()
@@ -50,6 +52,18 @@ class ViewModelsTest {
             assertEquals(2, state.articles.size)
             assertFalse(state.isRefreshing)
             assertFalse(state.loadFailed)
+        }
+    }
+
+    @Test
+    fun headlinesExposesLastSyncedTimeFromRepository() = runTest {
+        val repo = FakeRepo()
+        val vm = HeadlinesViewModel(repo, NewsSource.NEWS_LATEST)
+        vm.uiState.test {
+            awaitItem()
+            repo.syncedAt.value = 777L
+            advanceUntilIdle()
+            assertEquals(777L, expectMostRecentItem().lastSyncedEpochMs)
         }
     }
 

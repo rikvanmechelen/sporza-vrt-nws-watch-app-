@@ -82,6 +82,7 @@ fun CategoriesScreen(
                     title = stringResource(NewsSource.NEWS_LATEST.labelRes),
                     isRefreshing = ui.isRefreshing,
                     onRefresh = viewModel::refresh,
+                    syncedAtEpochMs = ui.lastSyncedEpochMs,
                 )
             }
             if (ui.showOfflineBanner) {

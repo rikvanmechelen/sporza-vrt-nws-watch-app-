@@ -119,6 +119,7 @@ fun MatchesScreen(
                         title = stringResource(R.string.source_matches),
                         isRefreshing = ui.isRefreshing,
                         onRefresh = viewModel::refresh,
+                        syncedAtEpochMs = ui.lastSyncedEpochMs,
                     )
                 }
                 if (ui.showOfflineBanner) {

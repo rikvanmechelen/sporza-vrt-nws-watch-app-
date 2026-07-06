@@ -6,7 +6,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-@Database(entities = [ArticleEntity::class, ArticleBodyEntity::class], version = 2, exportSchema = false)
+@Database(
+    entities = [ArticleEntity::class, ArticleBodyEntity::class, SyncStateEntity::class],
+    version = 3,
+    exportSchema = false,
+)
 @TypeConverters(BlockConverters::class)
 abstract class NewsDatabase : RoomDatabase() {
     abstract fun articleDao(): ArticleDao

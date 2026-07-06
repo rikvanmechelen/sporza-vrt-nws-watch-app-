@@ -24,8 +24,10 @@ private fun content(text: String) = ArticleContent(listOf(ContentBlock(BlockType
 private class FakeCache : ArticleCache {
     val headlines = mutableMapOf<NewsSource, MutableStateFlow<List<Article>>>()
     val bodies = mutableMapOf<String, ArticleContent>()
+    private val syncedAt = mutableMapOf<NewsSource, MutableStateFlow<Long?>>()
 
     private fun flowFor(source: NewsSource) = headlines.getOrPut(source) { MutableStateFlow(emptyList()) }
+    private fun syncFlowFor(source: NewsSource) = syncedAt.getOrPut(source) { MutableStateFlow(null) }
 
     override fun observeHeadlines(source: NewsSource): Flow<List<Article>> = flowFor(source)
     override suspend fun upsertHeadlines(source: NewsSource, articles: List<Article>) {
@@ -37,6 +39,10 @@ private class FakeCache : ArticleCache {
     override suspend fun saveBody(url: String, content: ArticleContent) { bodies[url] = content }
     override suspend fun latestHeadline(source: NewsSource): Article? =
         flowFor(source).value.maxByOrNull { it.publishedEpochMs }
+    override fun observeSyncedAt(source: NewsSource): Flow<Long?> = syncFlowFor(source)
+    override suspend fun recordSyncedAt(source: NewsSource, epochMs: Long) {
+        syncFlowFor(source).value = epochMs
+    }
 }
 
 private class FakeFeedService(var result: (String) -> List<Article>) : FeedService {
@@ -125,5 +131,29 @@ class DefaultNewsRepositoryTest {
     fun bodyPropagatesFetchFailure() = runTest {
         articles.result = { throw java.io.IOException("no net") }
         assertTrue(repo.body("https://x/a").isFailure)
+    }
+
+    @Test
+    fun refreshRecordsLastSyncedTimePerSourceOnSuccess() = runTest {
+        val clock = 123_456L
+        val stamped = DefaultNewsRepository(cache, feed, articles, now = { clock })
+        feed.result = { listOf(article("a", 1)) }
+        stamped.refresh(NewsSource.SPORT)
+        assertEquals(clock, stamped.lastSyncedAt(NewsSource.SPORT).first())
+        // A source that was never refreshed has no sync time (marker stays hidden there).
+        assertNull(stamped.lastSyncedAt(NewsSource.NEWS_LATEST).first())
+    }
+
+    @Test
+    fun failedRefreshLeavesLastSyncedTimeUntouched() = runTest {
+        var clock = 100L
+        val stamped = DefaultNewsRepository(cache, feed, articles, now = { clock })
+        feed.result = { listOf(article("a", 1)) }
+        stamped.refresh(NewsSource.NEWS_LATEST)
+        clock = 999L
+        feed.result = { throw java.io.IOException("offline") }
+        assertTrue(stamped.refresh(NewsSource.NEWS_LATEST).isFailure)
+        // Still the last *good* sync — the marker must not claim the failed attempt's time.
+        assertEquals(100L, stamped.lastSyncedAt(NewsSource.NEWS_LATEST).first())
     }
 }

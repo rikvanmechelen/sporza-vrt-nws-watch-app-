@@ -17,6 +17,7 @@ import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import me.vanmechelen.vrtsporza.R
 import me.vanmechelen.vrtsporza.VrtNwsApp
+import me.vanmechelen.vrtsporza.freshness.syncedClock
 import me.vanmechelen.vrtsporza.model.Match
 import me.vanmechelen.vrtsporza.ui.MainActivity
 import com.google.common.util.concurrent.ListenableFuture
@@ -38,6 +39,8 @@ private const val GREEN = 0xFF2FE07A.toInt() // Sporza — live score hero
 private const val TEAL = 0xFF8FE9BC.toInt() // section accent — header, games subscript, "+N meer"
 private const val CORAL = 0xFFFF5147.toInt() // live indicator dot
 private const val CARD = 0xFF111A16.toInt() // green-tinted scoreboard row background
+private const val SYNC_DOT = 0x8C2FE07A.toInt() // freshness marker — sport green @ 55% alpha
+private const val SYNC_LABEL = 0xFF6E7078.toInt() // freshness marker — dim neutral label
 
 // Tile scale 0.75 — 0.75× the design-px sizes, to sit a touch smaller than the app's 1.0 screens
 // while staying consistent. (Design px × 0.75: score 24→18, name 16→12, labels 13→10, emoji 17→13.)
@@ -67,12 +70,15 @@ class MatchesTileService : TileService() {
     override fun onTileRequest(
         requestParams: RequestBuilders.TileRequest,
     ): ListenableFuture<TileBuilders.Tile> = scope.future {
-        val matches = runCatching {
-            val repo = VrtNwsApp.instance.graph.matchesRepository
-            repo.refresh()
-            repo.matches().first()
-        }.getOrDefault(emptyList())
-        buildTile(matchesTileModel(matches))
+        val repo = runCatching { VrtNwsApp.instance.graph.matchesRepository }.getOrNull()
+        val matches = repo?.let {
+            runCatching { it.refresh(); it.matches().first() }.getOrDefault(emptyList())
+        } ?: emptyList()
+        // Absolute clock time (not "X geleden"): the tile is a frozen snapshot, so a relative string
+        // would go stale. `refresh()` above just ran, so this is normally "now"; on a failed refresh
+        // it's the last good sync (or null → marker hidden), never a wrong time.
+        val syncedAt = repo?.let { runCatching { it.lastSyncedAt().first() }.getOrNull() }
+        buildTile(matchesTileModel(matches), syncedAt)
     }
 
     override fun onTileResourcesRequest(
@@ -93,8 +99,8 @@ class MatchesTileService : TileService() {
             .build()
     }
 
-    private fun buildTile(model: MatchesTileModel): TileBuilders.Tile {
-        val root = if (model.rows.isEmpty()) emptyLayout() else contentLayout(model)
+    private fun buildTile(model: MatchesTileModel, syncedAtEpochMs: Long?): TileBuilders.Tile {
+        val root = if (model.rows.isEmpty()) emptyLayout(syncedAtEpochMs) else contentLayout(model, syncedAtEpochMs)
 
         val entry = TimelineBuilders.TimelineEntry.Builder()
             .setLayout(LayoutElementBuilders.Layout.Builder().setRoot(root).build())
@@ -175,24 +181,27 @@ class MatchesTileService : TileService() {
             .build()
     }
 
-    private fun emptyLayout(): LayoutElementBuilders.LayoutElement =
-        LayoutElementBuilders.Box.Builder()
+    private fun emptyLayout(syncedAtEpochMs: Long?): LayoutElementBuilders.LayoutElement {
+        val column = LayoutElementBuilders.Column.Builder()
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .addContent(refreshButton())
+            .addContent(vSpacer(12f))
+            .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
+        if (syncedAtEpochMs != null) {
+            column.addContent(vSpacer(12f))
+            column.addContent(freshnessRow(syncedAtEpochMs))
+        }
+        return LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(openMatchesModifiers())
-            .addContent(
-                LayoutElementBuilders.Column.Builder()
-                    .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-                    .addContent(refreshButton())
-                    .addContent(vSpacer(12f))
-                    .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
-                    .build(),
-            )
+            .addContent(column.build())
             .build()
+    }
 
-    private fun contentLayout(model: MatchesTileModel): LayoutElementBuilders.LayoutElement {
+    private fun contentLayout(model: MatchesTileModel, syncedAtEpochMs: Long?): LayoutElementBuilders.LayoutElement {
         val column = LayoutElementBuilders.Column.Builder()
             .setWidth(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
@@ -217,6 +226,11 @@ class MatchesTileService : TileService() {
             column.addContent(
                 text(getString(R.string.tile_matches_more, model.moreLiveCount), SZ_FOOTER, TEAL, FONT_WEIGHT_BOLD),
             )
+        }
+
+        if (syncedAtEpochMs != null) {
+            column.addContent(vSpacer(10f))
+            column.addContent(freshnessRow(syncedAtEpochMs))
         }
 
         return LayoutElementBuilders.Box.Builder()
@@ -366,6 +380,15 @@ class MatchesTileService : TileService() {
                     )
                     .build(),
             )
+            .build()
+
+    /** "● bijgewerkt om 14:23" — a green dot + a dim absolute-time label, below the scores. */
+    private fun freshnessRow(syncedAtEpochMs: Long): LayoutElementBuilders.LayoutElement =
+        LayoutElementBuilders.Row.Builder()
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(dot(SYNC_DOT, 5f))
+            .addContent(spacer(6f))
+            .addContent(text(getString(R.string.freshness_updated_at, syncedClock(syncedAtEpochMs)), SZ_FOOTER, SYNC_LABEL))
             .build()
 
     private fun spacer(width: Float): LayoutElementBuilders.LayoutElement =

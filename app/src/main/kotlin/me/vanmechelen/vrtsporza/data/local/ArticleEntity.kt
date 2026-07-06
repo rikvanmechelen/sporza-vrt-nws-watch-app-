@@ -27,6 +27,17 @@ data class ArticleBodyEntity(
     val fetchedEpochMs: Long,
 )
 
+/**
+ * When each [source]'s headlines were last successfully fetched — the source of truth for the
+ * freshness marker. Persisted (not just in-memory) so the marker stays honest across app restarts:
+ * on a cold, offline start we still show cached headlines, and this says how old they really are.
+ */
+@Entity(tableName = "sync_state")
+data class SyncStateEntity(
+    @PrimaryKey val source: String,
+    val lastSyncedEpochMs: Long,
+)
+
 /** Serialises [ContentBlock] lists to a single delimited string for Room. */
 class BlockConverters {
     @TypeConverter
