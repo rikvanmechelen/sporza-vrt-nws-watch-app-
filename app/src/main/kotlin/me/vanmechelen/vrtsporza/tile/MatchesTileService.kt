@@ -184,13 +184,9 @@ class MatchesTileService : TileService() {
     private fun emptyLayout(syncedAtEpochMs: Long?): LayoutElementBuilders.LayoutElement {
         val column = LayoutElementBuilders.Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .addContent(refreshButton())
+            .addContent(freshnessHeader(syncedAtEpochMs))
             .addContent(vSpacer(12f))
             .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
-        if (syncedAtEpochMs != null) {
-            column.addContent(vSpacer(12f))
-            column.addContent(freshnessRow(syncedAtEpochMs))
-        }
         return LayoutElementBuilders.Box.Builder()
             .setWidth(expand())
             .setHeight(expand())
@@ -206,13 +202,17 @@ class MatchesTileService : TileService() {
             .setWidth(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
 
-        // Refresh sits at the top in both states: when live it rides the "Live nu" header row;
-        // the upcoming fallback has no header, so it gets the standalone button up top too (rather
-        // than trailing at the bottom) — keeping the affordance in a consistent place.
+        // The freshness marker rides the top. When live, it sits on its own line directly under the
+        // "● Live nu" header (which carries the refresh icon). When not live there's no header, so
+        // the marker shares one line with the refresh icon (icon to the right of the text).
         if (model.isLive) {
             column.addContent(liveHeader())
+            if (syncedAtEpochMs != null) {
+                column.addContent(vSpacer(6f))
+                column.addContent(freshnessRow(syncedAtEpochMs))
+            }
         } else {
-            column.addContent(refreshButton())
+            column.addContent(freshnessHeader(syncedAtEpochMs))
         }
         column.addContent(vSpacer(12f))
 
@@ -226,11 +226,6 @@ class MatchesTileService : TileService() {
             column.addContent(
                 text(getString(R.string.tile_matches_more, model.moreLiveCount), SZ_FOOTER, TEAL, FONT_WEIGHT_BOLD),
             )
-        }
-
-        if (syncedAtEpochMs != null) {
-            column.addContent(vSpacer(10f))
-            column.addContent(freshnessRow(syncedAtEpochMs))
         }
 
         return LayoutElementBuilders.Box.Builder()
@@ -382,7 +377,7 @@ class MatchesTileService : TileService() {
             )
             .build()
 
-    /** "● bijgewerkt om 14:23" — a green dot + a dim absolute-time label, below the scores. */
+    /** "● bijgewerkt om 14:23" — a green dot + a dim absolute-time label. */
     private fun freshnessRow(syncedAtEpochMs: Long): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Row.Builder()
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
@@ -390,6 +385,21 @@ class MatchesTileService : TileService() {
             .addContent(spacer(6f))
             .addContent(text(getString(R.string.freshness_updated_at, syncedClock(syncedAtEpochMs)), SZ_FOOTER, SYNC_LABEL))
             .build()
+
+    /**
+     * Top affordance when there's no "● Live nu" header (upcoming / empty tiles): the freshness
+     * marker with the refresh icon to its right on the same line. Falls back to a lone refresh
+     * button when nothing has synced yet (no honest time to show).
+     */
+    private fun freshnessHeader(syncedAtEpochMs: Long?): LayoutElementBuilders.LayoutElement {
+        if (syncedAtEpochMs == null) return refreshButton()
+        return LayoutElementBuilders.Row.Builder()
+            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+            .addContent(freshnessRow(syncedAtEpochMs))
+            .addContent(spacer(10f))
+            .addContent(refreshButton(box = 26f, icon = 14f))
+            .build()
+    }
 
     private fun spacer(width: Float): LayoutElementBuilders.LayoutElement =
         LayoutElementBuilders.Spacer.Builder().setWidth(dp(width)).build()
