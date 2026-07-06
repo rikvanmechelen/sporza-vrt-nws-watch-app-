@@ -41,7 +41,7 @@ private const val META = 0xFFA6AAB2.toInt()
 
 // Freshness marker: news-lavender dot at 55% + a dim neutral label (mirrors the app's #6E7078).
 private const val SYNC_DOT = 0x8CA99CFF.toInt() // lavender @ 55% alpha
-private const val SYNC_LABEL = 0xFF6E7078.toInt()
+private const val SYNC_LABEL = 0xFF9A9DA4.toInt() // dim neutral (matches VrtAccents.FreshnessLabel)
 
 /** A Tile showing the latest cached headline; tapping opens the app. */
 class LatestHeadlineTileService : TileService() {

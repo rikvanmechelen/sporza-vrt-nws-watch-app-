@@ -40,7 +40,7 @@ private const val TEAL = 0xFF8FE9BC.toInt() // section accent — header, games 
 private const val CORAL = 0xFFFF5147.toInt() // live indicator dot
 private const val CARD = 0xFF111A16.toInt() // green-tinted scoreboard row background
 private const val SYNC_DOT = 0x8C2FE07A.toInt() // freshness marker — sport green @ 55% alpha
-private const val SYNC_LABEL = 0xFF6E7078.toInt() // freshness marker — dim neutral label
+private const val SYNC_LABEL = 0xFF9A9DA4.toInt() // freshness marker — dim neutral label
 
 // Tile scale 0.75 — 0.75× the design-px sizes, to sit a touch smaller than the app's 1.0 screens
 // while staying consistent. (Design px × 0.75: score 24→18, name 16→12, labels 13→10, emoji 17→13.)

@@ -61,11 +61,12 @@ object VrtAccents {
     val LiveContainer = Color(0x1FFF5147) // rgba(255,81,71,.12)
 
     /**
-     * Data-freshness marker label — a dim neutral gray (#6E7078). Deliberately quieter than
+     * Data-freshness marker label — a dim neutral gray. Deliberately quieter than
      * [OnSurfaceVariant] meta text so "bijgewerkt …" never competes with real content or per-item
-     * timestamps; the section accent lives only in the marker's dot.
+     * timestamps; the section accent lives only in the marker's dot. (Nudged up from the handoff's
+     * #6E7078, which read too dark on-device.)
      */
-    val FreshnessLabel = Color(0xFF6E7078)
+    val FreshnessLabel = Color(0xFF9A9DA4)
 
     /** Offline staleness banner — amber pill. */
     val OfflineText = Color(0xFFFFC38A)
