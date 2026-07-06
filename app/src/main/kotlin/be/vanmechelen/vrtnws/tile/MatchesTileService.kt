@@ -185,9 +185,9 @@ class MatchesTileService : TileService() {
             .addContent(
                 LayoutElementBuilders.Column.Builder()
                     .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-                    .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
-                    .addContent(vSpacer(12f))
                     .addContent(refreshButton())
+                    .addContent(vSpacer(12f))
+                    .addContent(text(getString(R.string.tile_matches_empty), SZ_NAME, NAME, maxLines = 2))
                     .build(),
             )
             .build()
@@ -197,10 +197,15 @@ class MatchesTileService : TileService() {
             .setWidth(expand())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
 
+        // Refresh sits at the top in both states: when live it rides the "Live nu" header row;
+        // the upcoming fallback has no header, so it gets the standalone button up top too (rather
+        // than trailing at the bottom) — keeping the affordance in a consistent place.
         if (model.isLive) {
             column.addContent(liveHeader())
-            column.addContent(vSpacer(12f))
+        } else {
+            column.addContent(refreshButton())
         }
+        column.addContent(vSpacer(12f))
 
         model.rows.forEachIndexed { i, match ->
             if (i > 0) column.addContent(vSpacer(8f))
@@ -212,13 +217,6 @@ class MatchesTileService : TileService() {
             column.addContent(
                 text(getString(R.string.tile_matches_more, model.moreLiveCount), SZ_FOOTER, TEAL, FONT_WEIGHT_BOLD),
             )
-        }
-
-        // When live, refresh lives in the header next to "Live nu"; the upcoming fallback has no
-        // header, so it keeps a refresh button at the bottom.
-        if (!model.isLive) {
-            column.addContent(vSpacer(12f))
-            column.addContent(refreshButton())
         }
 
         return LayoutElementBuilders.Box.Builder()
